@@ -1,0 +1,41 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+.env*
+!.env.example
+*.pem
+
+# Client files (bank details, raw text) — never commit
+client-data/
+
+# Private notes and files — never commit
+private/
+
+# Dependencies / build
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+npm-debug.log*
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Test output
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Personal Claude settings
+.claude/settings.local.json
