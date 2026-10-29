@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
+    // Database tests hit the hosted dev project; they run only via npm run test:db.
+    exclude: ["**/node_modules/**", "tests/integration/db/**"],
     passWithNoTests: true,
   },
 });
