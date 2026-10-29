@@ -4,7 +4,7 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ProductListing, ProductListingSkeleton } from "@/components/products/product-listing";
 import {
   getCategoryTree,
-  getFitmentChecker,
+  getFitments,
   getFitmentLabels,
   getProducts,
   getTractorModels,
@@ -14,11 +14,11 @@ export const metadata: Metadata = { title: "Shop all products" };
 
 /** All products. Target of the header search (?q=) and the tractor selector (?model=). */
 export default async function ShopPage({ searchParams }: PageProps<"/shop">) {
-  const [tree, products, models, fitsModel, fitmentLabels] = await Promise.all([
+  const [tree, products, models, fitments, fitmentLabels] = await Promise.all([
     getCategoryTree(),
     getProducts(),
     getTractorModels(),
-    getFitmentChecker(),
+    getFitments(),
     getFitmentLabels(),
   ]);
 
@@ -31,7 +31,7 @@ export default async function ShopPage({ searchParams }: PageProps<"/shop">) {
           basePath="/shop"
           products={products}
           models={models}
-          fitsModel={fitsModel}
+          fitments={fitments}
           fitmentLabels={fitmentLabels}
           searchParams={searchParams}
           groups={{

@@ -1,6 +1,6 @@
 "use client";
 
-// Make -> model -> year selector. Submits a plain GET form (?model=<id>) to a listing page.
+// Make -> model selector (model options show production years; fitment data is per model, not per year). Submits a plain GET form (?model=<id>) to a listing page.
 import { useId, useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { TractorModel } from "@/types/catalog";
 
 const selectClass =
-  "h-11 w-full rounded-lg border border-input bg-card px-3 text-body-md disabled:cursor-not-allowed disabled:opacity-60";
+  "h-11 w-full rounded-lg border border-input bg-card px-3 text-body-lg md:text-body-md disabled:cursor-not-allowed disabled:opacity-60";
 
 export function TractorSelector({
   models,
@@ -28,12 +28,9 @@ export function TractorSelector({
   const initial = models.find((m) => m.id === initialModelId);
   const [make, setMake] = useState(initial?.make ?? "");
   const [modelId, setModelId] = useState(initial?.id ?? "");
-  const [year, setYear] = useState("");
 
   const makes = [...new Set(models.map((m) => m.make))];
   const makeModels = models.filter((m) => m.make === make);
-  const selected = models.find((m) => m.id === modelId);
-  const years = selected ? yearRange(selected) : [];
 
   return (
     <form
@@ -41,7 +38,7 @@ export function TractorSelector({
       method="get"
       className={cn(
         "grid gap-3",
-        layout === "row" && "sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end",
+        layout === "row" && "sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto] lg:items-end",
         className,
       )}
     >
@@ -55,7 +52,6 @@ export function TractorSelector({
           onChange={(e) => {
             setMake(e.target.value);
             setModelId("");
-            setYear("");
           }}
           className={selectClass}
         >
@@ -77,35 +73,13 @@ export function TractorSelector({
           value={modelId}
           disabled={!make}
           required
-          onChange={(e) => {
-            setModelId(e.target.value);
-            setYear("");
-          }}
+          onChange={(e) => setModelId(e.target.value)}
           className={selectClass}
         >
           <option value="">{make ? "Select model" : "Choose a make first"}</option>
           {makeModels.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.model}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="space-y-1">
-        <label htmlFor={`${id}-year`} className="text-label-md">
-          3. Year <span className="font-normal text-muted-foreground">(optional)</span>
-        </label>
-        <select
-          id={`${id}-year`}
-          value={year}
-          disabled={!selected}
-          onChange={(e) => setYear(e.target.value)}
-          className={selectClass}
-        >
-          <option value="">{selected ? "Any year" : "Choose a model first"}</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
+              {m.model} ({m.year_from}–{m.year_to ?? "present"})
             </option>
           ))}
         </select>
@@ -118,10 +92,3 @@ export function TractorSelector({
   );
 }
 
-function yearRange(model: TractorModel): number[] {
-  // Fixed upper bound keeps server and client output identical (no Date in render).
-  const end = model.year_to ?? 2026;
-  const out: number[] = [];
-  for (let y = end; y >= model.year_from; y--) out.push(y);
-  return out;
-}

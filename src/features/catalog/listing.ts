@@ -1,7 +1,7 @@
 // Product listing rules: search, tractor fitment filter, stock filter, price range and sort.
 // Works on plain rows so it can later move into a Supabase query unchanged in behaviour.
 import { z } from "zod";
-import type { Product } from "@/types/catalog";
+import type { Product, ProductFitment } from "@/types/catalog";
 import { stockStatus } from "@/features/inventory/stock";
 
 const SORT_VALUES = ["relevance", "price-asc", "price-desc", "name"] as const;
@@ -37,11 +37,13 @@ export function parseListingParams(raw: Record<string, string | string[] | undef
   return listingParamsSchema.parse(raw);
 }
 
-export function filterProducts(
-  products: Product[],
-  params: ListingParams,
-  fitsModel: (productId: string, modelId: string) => boolean,
-): Product[] {
+export function fitmentChecker(fitments: ProductFitment[]) {
+  const pairs = new Set(fitments.map((f) => `${f.product_id}|${f.tractor_model_id}`));
+  return (productId: string, modelId: string) => pairs.has(`${productId}|${modelId}`);
+}
+
+export function filterProducts(products: Product[], params: ListingParams, fitments: ProductFitment[]): Product[] {
+  const fitsModel = fitmentChecker(fitments);
   const q = params.q?.toLowerCase();
   const result = products.filter((p) => {
     if (q && ![p.name, p.sku, p.oem_ref ?? "", p.short_description].some((f) => f.toLowerCase().includes(q))) {

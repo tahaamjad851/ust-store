@@ -6,9 +6,9 @@ import { ArrowLeft, Lock, MessageCircle, ShoppingCart, Trash2, Truck } from "luc
 import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/products/stock-indicator";
 import { whatsappHref } from "@/lib/contact";
-import { formatPKR, unitPrice } from "@/lib/pricing";
+import { formatPKR } from "@/lib/pricing";
 import type { CartCatalogItem } from "@/services/catalog";
-import { useCart } from "./cart-provider";
+import { MAX_LINE_QTY, useCart } from "./cart-provider";
 import { QuantityStepper } from "./quantity-stepper";
 import { usePricedLines } from "./use-priced-lines";
 
@@ -87,8 +87,7 @@ export function CartView({
             <span className="text-right">Line total</span>
           </div>
           <ul className="divide-y divide-border">
-            {priced.map(({ product, quantity }) => {
-              const price = unitPrice(product);
+            {priced.map(({ product, quantity, unit_price_paisa: price, line_total_paisa: lineTotal }) => {
               return (
                 <li key={product.id} className="grid grid-cols-[72px_1fr] gap-3 p-4 md:grid-cols-[1fr_110px_140px_110px] md:items-center md:gap-4">
                   <div className="contents md:flex md:gap-3">
@@ -112,13 +111,13 @@ export function CartView({
                   <div className="col-span-2 flex items-center justify-between gap-3 md:col-span-1 md:justify-center">
                     <QuantityStepper
                       value={quantity}
-                      onChange={(n) => setQuantity(product.id, n)}
-                      max={Math.max(1, Math.min(99, product.stock_qty))}
+                      onChange={(n) => setQuantity(product.id, product.name, n)}
+                      max={Math.max(1, Math.min(MAX_LINE_QTY, product.stock_qty))}
                       label={`Quantity for ${product.name}`}
                     />
-                    <p className="text-price-md tabular md:hidden">{formatPKR(price * quantity)}</p>
+                    <p className="text-price-md tabular md:hidden">{formatPKR(lineTotal)}</p>
                   </div>
-                  <p className="hidden text-right text-price-md tabular md:block">{formatPKR(price * quantity)}</p>
+                  <p className="hidden text-right text-price-md tabular md:block">{formatPKR(lineTotal)}</p>
                   <div className="col-span-2 md:col-span-4">
                     <button
                       type="button"

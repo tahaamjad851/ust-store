@@ -11,7 +11,7 @@ import {
   getCategoryBySlug,
   getCategoryTree,
   getChildCategories,
-  getFitmentChecker,
+  getFitments,
   getFitmentLabels,
   getProductsInCategory,
   getStoreSettings,
@@ -50,12 +50,12 @@ async function SubcategoryContent({ params, searchParams }: Props) {
   if (!found) notFound();
   const { parent, category } = found;
 
-  const [settings, siblings, products, models, fitsModel, fitmentLabels] = await Promise.all([
+  const [settings, siblings, products, models, fitments, fitmentLabels] = await Promise.all([
     getStoreSettings(),
     getChildCategories(parent.id),
     getProductsInCategory(category.id),
     getTractorModels(),
-    getFitmentChecker(),
+    getFitments(),
     getFitmentLabels(),
   ]);
   const parentPath = `/categories/${parent.slug}`;
@@ -75,7 +75,7 @@ async function SubcategoryContent({ params, searchParams }: Props) {
             basePath={basePath}
             products={products}
             models={models}
-            fitsModel={fitsModel}
+            fitments={fitments}
             fitmentLabels={fitmentLabels}
             searchParams={searchParams}
             groups={{
@@ -91,7 +91,7 @@ async function SubcategoryContent({ params, searchParams }: Props) {
         </Suspense>
       </div>
 
-      <section aria-labelledby="bulk-title" className="mt-6 bg-primary text-primary-foreground">
+      <section aria-labelledby="bulk-title" className="on-dark mt-6 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-page flex-col gap-4 px-margin py-8 lg:flex-row lg:items-center lg:justify-between lg:px-margin-desktop">
           <div>
             <h2 id="bulk-title" className="text-headline-md">

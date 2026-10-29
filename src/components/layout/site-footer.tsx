@@ -5,12 +5,12 @@ import type { Category } from "@/types/catalog";
 import type { StoreSettings } from "@/types/store";
 
 const heading = "font-display text-headline-sm text-footer-foreground";
-const link = "text-body-md text-footer-muted hover:text-footer-foreground hover:underline";
+const link = "inline-flex min-h-11 items-center text-body-md text-footer-muted hover:text-footer-foreground hover:underline";
 
 export function SiteFooter({ settings, categories }: { settings: StoreSettings; categories: Category[] }) {
   const mailto = mailtoHref(settings.email);
   return (
-    <footer className="bg-footer pb-20 text-footer-foreground lg:pb-0">
+    <footer className="on-dark bg-footer pb-20 text-footer-foreground lg:pb-0">
       <div className="mx-auto grid max-w-page gap-8 px-margin py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-margin-desktop">
         <div className="space-y-3">
           <p className="flex items-center gap-2 font-display text-headline-sm">
@@ -28,7 +28,7 @@ export function SiteFooter({ settings, categories }: { settings: StoreSettings; 
           <h2 id="footer-shop" className={heading}>
             Shop
           </h2>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-1">
             {categories.map((c) => (
               <li key={c.id}>
                 <Link href={`/categories/${c.slug}`} className={link}>
@@ -43,7 +43,7 @@ export function SiteFooter({ settings, categories }: { settings: StoreSettings; 
           <h2 id="footer-service" className={heading}>
             Customer service
           </h2>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-1">
             <li>
               <Link href="/cart" className={link}>
                 Your cart
@@ -104,7 +104,7 @@ export function SiteFooter({ settings, categories }: { settings: StoreSettings; 
           </address>
         </div>
       </div>
-      <div className="border-t border-white/10">
+      <div className="border-t border-footer-border">
         <p className="mx-auto max-w-page px-margin py-4 text-body-sm text-footer-muted lg:px-margin-desktop">
           © {settings.business_name}. All rights reserved.
         </p>

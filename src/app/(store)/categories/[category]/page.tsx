@@ -15,7 +15,7 @@ import {
   getCategoryBySlug,
   getCategoryTree,
   getChildCategories,
-  getFitmentChecker,
+  getFitments,
   getFitmentLabels,
   getProductsInCategory,
   getStoreSettings,
@@ -90,7 +90,7 @@ async function CategoryContent({ params, searchParams }: PageProps<"/categories/
                 <li key={m.id}>
                   <Link
                     href={`/shop?model=${m.id}`}
-                    className="inline-flex min-h-9 items-center rounded-full border border-border bg-card px-3 text-label-md hover:border-primary"
+                    className="inline-flex min-h-11 items-center rounded-full border border-border bg-card px-3 text-label-md hover:border-primary"
                   >
                     {m.model}
                   </Link>
@@ -140,10 +140,10 @@ async function CategoryProducts({
   basePath: string;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [products, models, fitsModel, fitmentLabels] = await Promise.all([
+  const [products, models, fitments, fitmentLabels] = await Promise.all([
     getProductsInCategory(categoryId),
     getTractorModels(),
-    getFitmentChecker(),
+    getFitments(),
     getFitmentLabels(),
   ]);
   return (
@@ -151,7 +151,7 @@ async function CategoryProducts({
       basePath={basePath}
       products={products}
       models={models}
-      fitsModel={fitsModel}
+      fitments={fitments}
       fitmentLabels={fitmentLabels}
       searchParams={searchParams}
     />

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { whatsappHref } from "@/lib/contact";
-import { formatPKR, unitPrice } from "@/lib/pricing";
+import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { ADDRESS_TYPES, checkoutSchema, PROVINCES, type CheckoutInput } from "@/lib/validation/checkout";
 import type { CartCatalogItem } from "@/services/catalog";
@@ -26,7 +26,7 @@ type Props = {
   settings: Pick<StoreSettings, "delivery_methods" | "payment_methods" | "free_delivery_threshold_paisa" | "whatsapp_number" | "phone_primary">;
 };
 
-const fieldInput = "h-11 border-input bg-card text-body-md";
+const fieldInput = "h-11 rounded-lg border-input bg-card text-body-lg md:text-body-md";
 
 function FieldErrorText({ id, error }: { id: string; error?: FieldError }) {
   if (!error?.message) return null;
@@ -188,7 +188,14 @@ export function CheckoutForm({ catalog, settings }: Props) {
             render={({ field }) => (
               <fieldset className="space-y-2">
                 <legend className="text-label-lg">Address type</legend>
-                <RadioGroup value={field.value} onValueChange={field.onChange} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <RadioGroup
+                  ref={(el) => field.ref(el?.querySelector<HTMLButtonElement>('[role="radio"][data-state="checked"], [role="radio"]') ?? null)}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  aria-invalid={!!errors.address_type}
+                  aria-describedby={describedBy("address_type")}
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+                >
                   {ADDRESS_TYPES.map((t) => (
                     <Label
                       key={t.value}
@@ -200,6 +207,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
                     </Label>
                   ))}
                 </RadioGroup>
+                <FieldErrorText id="address_type-error" error={errors.address_type} />
               </fieldset>
             )}
           />
@@ -211,7 +219,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
                 autoComplete="address-level1"
                 aria-invalid={!!errors.province}
                 aria-describedby={describedBy("province")}
-                className="h-11 w-full rounded-md border border-input bg-card px-3 text-body-md"
+                className="h-11 w-full rounded-lg border border-input bg-card px-3 text-body-lg md:text-body-md"
                 {...register("province")}
               >
                 {PROVINCES.map((p) => (
@@ -277,7 +285,15 @@ export function CheckoutForm({ catalog, settings }: Props) {
             control={control}
             name="delivery_method_id"
             render={({ field }) => (
-              <RadioGroup value={field.value} onValueChange={field.onChange} aria-label="Delivery method" className="gap-2">
+              <RadioGroup
+                ref={(el) => field.ref(el?.querySelector<HTMLButtonElement>('[role="radio"][data-state="checked"], [role="radio"]') ?? null)}
+                value={field.value}
+                onValueChange={field.onChange}
+                aria-label="Delivery method"
+                aria-invalid={!!errors.delivery_method_id}
+                aria-describedby={describedBy("delivery_method_id")}
+                className="gap-2"
+              >
                 {settings.delivery_methods.map((m) => (
                   <Label
                     key={m.id}
@@ -305,7 +321,15 @@ export function CheckoutForm({ catalog, settings }: Props) {
             control={control}
             name="payment_method"
             render={({ field }) => (
-              <RadioGroup value={field.value} onValueChange={field.onChange} aria-label="Payment method" className="gap-2">
+              <RadioGroup
+                ref={(el) => field.ref(el?.querySelector<HTMLButtonElement>('[role="radio"][data-state="checked"], [role="radio"]') ?? null)}
+                value={field.value}
+                onValueChange={field.onChange}
+                aria-label="Payment method"
+                aria-invalid={!!errors.payment_method}
+                aria-describedby={describedBy("payment_method")}
+                className="gap-2"
+              >
                 {paymentMethods.map((m) => (
                   <Label
                     key={m.id}
@@ -352,7 +376,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
               rows={3}
               placeholder="Tractor model, packing requests or delivery instructions"
               aria-describedby={describedBy("notes")}
-              className="border-input bg-card text-body-md"
+              className="rounded-lg border-input bg-card text-body-lg md:text-body-md"
               {...register("notes")}
             />
             <FieldErrorText id="notes-error" error={errors.notes} />
@@ -366,7 +390,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
             Order summary
           </h2>
           <ul className="mt-4 divide-y divide-border">
-            {priced.map(({ product, quantity }) => (
+            {priced.map(({ product, quantity, line_total_paisa }) => (
               <li key={product.id} className="flex gap-3 py-3">
                 <Image
                   src={product.image_paths[0]}
@@ -379,7 +403,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
                   <p className="line-clamp-2 text-label-md">{product.name}</p>
                   <p className="text-body-sm text-muted-foreground">Qty: {quantity}</p>
                 </div>
-                <p className="text-label-lg tabular">{formatPKR(unitPrice(product) * quantity)}</p>
+                <p className="text-label-lg tabular">{formatPKR(line_total_paisa)}</p>
               </li>
             ))}
           </ul>
@@ -411,7 +435,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
             <Lock />
             Place order ({formatPKR(totals.subtotal_paisa)})
           </Button>
-          <Link href="/cart" className="mt-3 block text-center text-label-md text-primary underline">
+          <Link href="/cart" className="mt-1 flex min-h-11 items-center justify-center text-label-md text-primary underline">
             Back to cart
           </Link>
         </section>

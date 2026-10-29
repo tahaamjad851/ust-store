@@ -3,10 +3,9 @@
 // Two-level category drawer: categories -> subcategories with a back arrow.
 // Radix Dialog (via Sheet) provides the focus trap, Escape to close and focus return.
 import Link from "next/link";
-import { createContext, useContext, useRef, useState } from "react";
+import { createContext, useContext, useId, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, ChevronRight, Menu, MessageCircle, X } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 import type { Category } from "@/types/catalog";
 import { CategoryIcon } from "./category-icon";
 
@@ -14,10 +13,11 @@ export type DrawerCategory = Pick<Category, "id" | "slug" | "name" | "icon"> & {
   children: Pick<Category, "id" | "slug" | "name" | "icon">[];
 };
 
-const DrawerContext = createContext<((trigger: HTMLElement) => void) | null>(null);
+type DrawerContextValue = { open: boolean; contentId: string; openFrom: (trigger: HTMLElement) => void };
+const DrawerContext = createContext<DrawerContextValue | null>(null);
 
 const rowClass =
-  "flex min-h-12 w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-label-lg text-foreground hover:bg-surface-low focus-visible:-outline-offset-2";
+  "flex min-h-12 w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-body-lg font-semibold text-foreground hover:bg-surface-low focus-visible:-outline-offset-2";
 
 export function CategoryDrawerProvider({
   categories,
@@ -36,6 +36,8 @@ export function CategoryDrawerProvider({
   const parentRefs = useRef(new Map<string, HTMLButtonElement>());
   // Triggers live outside Radix (header and tab bar), so focus is returned to them by hand.
   const triggerRef = useRef<HTMLElement | null>(null);
+  const contentId = useId();
+  const levelTitleId = useId();
 
   const active = categories.find((c) => c.id === activeId) ?? null;
 
@@ -59,14 +61,19 @@ export function CategoryDrawerProvider({
 
   return (
     <DrawerContext.Provider
-      value={(trigger) => {
-        triggerRef.current = trigger;
-        setOpen(true);
+      value={{
+        open,
+        contentId,
+        openFrom(trigger) {
+          triggerRef.current = trigger;
+          setOpen(true);
+        },
       }}
     >
       {children}
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
+          id={contentId}
           side="left"
           showCloseButton={false}
           className="w-full gap-0 p-0 sm:max-w-sm"
@@ -88,22 +95,27 @@ export function CategoryDrawerProvider({
                   onClick={showParents}
                   className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-surface-low"
                   aria-label="Back to all categories"
+                  aria-describedby={levelTitleId}
                 >
                   <ArrowLeft className="size-5" aria-hidden="true" />
                 </button>
-                <SheetTitle className="flex-1 font-display text-headline-sm">{active.name}</SheetTitle>
+                <SheetTitle id={levelTitleId} className="flex-1 font-display text-headline-sm">
+                  {active.name}
+                </SheetTitle>
                 <CloseButton />
               </div>
               <nav aria-label={`${active.name} subcategories`} className="flex-1 overflow-y-auto">
                 <ul>
-                  <li>
+                  <li className="p-3">
                     <Link
                       href={`/categories/${active.slug}`}
                       onClick={close}
-                      className={cn(rowClass, "justify-between font-bold text-primary")}
+                      className="flex min-h-14 items-center justify-between gap-3 rounded-lg bg-primary px-4 py-3 text-body-lg font-bold text-primary-foreground hover:bg-brand-hover"
                     >
                       View all {active.name}
-                      <ArrowRight className="size-5" aria-hidden="true" />
+                      <span className="flex size-9 items-center justify-center rounded-full bg-primary-foreground/15">
+                        <ArrowRight className="size-5" aria-hidden="true" />
+                      </span>
                     </Link>
                   </li>
                   {active.children.map((child) => (
@@ -170,7 +182,7 @@ export function CategoryDrawerProvider({
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex min-h-12 items-center gap-3 rounded-lg bg-whatsapp px-4 py-2 text-white hover:bg-whatsapp-hover"
+              className="flex min-h-12 items-center gap-3 rounded-lg bg-primary px-4 py-2 text-primary-foreground hover:bg-brand-hover"
             >
               <MessageCircle className="size-5 shrink-0" aria-hidden="true" />
               <span className="flex-1 text-label-lg">
@@ -198,10 +210,17 @@ function CloseButton() {
 }
 
 export function CategoryDrawerTrigger({ className, children }: { className?: string; children: React.ReactNode }) {
-  const open = useContext(DrawerContext);
-  if (!open) throw new Error("CategoryDrawerTrigger must be used inside <CategoryDrawerProvider>");
+  const drawer = useContext(DrawerContext);
+  if (!drawer) throw new Error("CategoryDrawerTrigger must be used inside <CategoryDrawerProvider>");
   return (
-    <button type="button" onClick={(e) => open(e.currentTarget)} aria-haspopup="dialog" className={className}>
+    <button
+      type="button"
+      onClick={(e) => drawer.openFrom(e.currentTarget)}
+      aria-haspopup="dialog"
+      aria-expanded={drawer.open}
+      aria-controls={drawer.open ? drawer.contentId : undefined}
+      className={className}
+    >
       {children}
     </button>
   );

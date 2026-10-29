@@ -5,7 +5,7 @@ import { DEMO_CATEGORIES } from "@/lib/mock/categories";
 import { DEMO_PRODUCTS } from "@/lib/mock/products";
 import { DEMO_STORE_SETTINGS } from "@/lib/mock/store-settings";
 import { DEMO_PRODUCT_FITMENTS, DEMO_TRACTOR_MODELS } from "@/lib/mock/tractors";
-import type { Category, Product, TractorModel } from "@/types/catalog";
+import type { Category, Product, ProductFitment, TractorModel } from "@/types/catalog";
 import type { StoreSettings } from "@/types/store";
 
 export type CategoryNode = Category & { children: Category[] };
@@ -54,9 +54,14 @@ export async function getTractorModels(): Promise<TractorModel[]> {
   return DEMO_TRACTOR_MODELS;
 }
 
-export async function getFitmentChecker() {
-  const pairs = new Set(DEMO_PRODUCT_FITMENTS.map((f) => `${f.product_id}|${f.tractor_model_id}`));
-  return (productId: string, modelId: string) => pairs.has(`${productId}|${modelId}`);
+/** product_fitments rows. Plain data so it can be cached ("use cache") once this reads from Supabase. */
+export async function getFitments(): Promise<ProductFitment[]> {
+  return DEMO_PRODUCT_FITMENTS;
+}
+
+/** Ids of sellable products (for pruning the DEMO client cart). */
+export async function getActiveProductIds(): Promise<string[]> {
+  return DEMO_PRODUCTS.filter((p) => p.is_active).map((p) => p.id);
 }
 
 export async function getModelsForProduct(productId: string): Promise<TractorModel[]> {

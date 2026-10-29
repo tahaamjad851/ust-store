@@ -20,7 +20,7 @@ export function MainNav({ items }: { items: NavItem[] }) {
                 href={item.href}
                 aria-current={current ? "page" : undefined}
                 className={cn(
-                  "inline-flex h-9 items-center rounded-lg px-3 text-label-md whitespace-nowrap",
+                  "inline-flex h-11 items-center rounded-lg px-3 text-label-md whitespace-nowrap",
                   current ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-surface-high",
                 )}
               >

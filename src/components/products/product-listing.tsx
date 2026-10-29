@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { filterProducts, paginate, parseListingParams, SORT_OPTIONS, type ListingParams } from "@/features/catalog/listing";
+import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import type { Category, Product, TractorModel } from "@/types/catalog";
+import type { Category, Product, ProductFitment, TractorModel } from "@/types/catalog";
 import { FiltersPanel } from "./filters-panel";
 import { ProductCard } from "./product-card";
 import { SortSelect } from "./sort-select";
@@ -13,14 +14,14 @@ type Props = {
   basePath: string;
   products: Product[];
   models: TractorModel[];
-  fitsModel: (productId: string, modelId: string) => boolean;
+  fitments: ProductFitment[];
   fitmentLabels: Record<string, string>;
   groups?: { title: string; items: (Pick<Category, "id" | "name"> & { href: string; current: boolean })[] };
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const FORM_ID = "listing-filters";
-const fieldClass = "h-11 w-full rounded-lg border border-input bg-card px-3 text-body-md";
+const fieldClass = "h-11 w-full rounded-lg border border-input bg-card px-3 text-body-lg md:text-body-md";
 
 function hrefWith(basePath: string, params: ListingParams, overrides: Partial<Record<keyof ListingParams, string | number | undefined>>) {
   const merged: Record<string, string | number | undefined> = { ...params, ...overrides };
@@ -35,9 +36,9 @@ function hrefWith(basePath: string, params: ListingParams, overrides: Partial<Re
   return s ? `${basePath}?${s}` : basePath;
 }
 
-export async function ProductListing({ basePath, products, models, fitsModel, fitmentLabels, groups, searchParams }: Props) {
+export async function ProductListing({ basePath, products, models, fitments, fitmentLabels, groups, searchParams }: Props) {
   const params = parseListingParams(await searchParams);
-  const filtered = filterProducts([...products], params, fitsModel);
+  const filtered = filterProducts([...products], params, fitments);
   const { items, page, pageCount, total } = paginate(filtered, params.page);
   const model = models.find((m) => m.id === params.model);
   const makes = [...new Set(models.map((m) => m.make))];
@@ -47,7 +48,7 @@ export async function ProductListing({ basePath, products, models, fitsModel, fi
     model && { label: `Fits ${model.model}`, href: hrefWith(basePath, params, { model: undefined, page: 1 }) },
     params.stock && { label: "In stock only", href: hrefWith(basePath, params, { stock: undefined, page: 1 }) },
     (params.min !== undefined || params.max !== undefined) && {
-      label: `Rs ${params.min ?? 0} – ${params.max ?? "any"}`,
+      label: `${formatPKR((params.min ?? 0) * 100)} – ${params.max !== undefined ? formatPKR(params.max * 100) : "any"}`,
       href: hrefWith(basePath, params, { min: undefined, max: undefined, page: 1 }),
     },
   ].filter((a): a is { label: string; href: string } => Boolean(a));
@@ -111,7 +112,7 @@ export async function ProductListing({ basePath, products, models, fitsModel, fi
       <Button type="submit" className="h-11 w-full">
         Apply filters
       </Button>
-      <Link href={basePath} className="block text-center text-label-md text-primary underline">
+      <Link href={basePath} className="flex min-h-11 items-center justify-center text-label-md text-primary underline">
         Reset all filters
       </Link>
     </form>
@@ -132,7 +133,7 @@ export async function ProductListing({ basePath, products, models, fitsModel, fi
                     href={g.href}
                     aria-current={g.current ? "page" : undefined}
                     className={cn(
-                      "flex min-h-9 items-center rounded-sm px-2 text-body-md hover:bg-surface-low",
+                      "flex min-h-11 items-center rounded-sm px-2 text-body-md hover:bg-surface-low",
                       g.current && "bg-brand-tint font-semibold text-brand-tint-foreground",
                     )}
                   >
@@ -160,7 +161,7 @@ export async function ProductListing({ basePath, products, models, fitsModel, fi
               <li key={a.label}>
                 <Link
                   href={a.href}
-                  className="inline-flex min-h-8 items-center gap-1 rounded-sm bg-surface-container px-2 text-label-md hover:bg-surface-high"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-sm bg-surface-container px-2 text-label-md hover:bg-surface-high"
                 >
                   {a.label}
                   <X className="size-3.5" aria-hidden="true" />
@@ -174,7 +175,7 @@ export async function ProductListing({ basePath, products, models, fitsModel, fi
         {items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-input bg-card p-8 text-center">
             <p className="text-label-lg">No products match these filters.</p>
-            <Link href={basePath} className="mt-2 inline-block text-label-md text-primary underline">
+            <Link href={basePath} className="mt-2 inline-flex min-h-11 items-center text-label-md text-primary underline">
               Clear filters
             </Link>
           </div>

@@ -58,13 +58,15 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-whatsapp: var(--whatsapp);
   --color-whatsapp-hover: var(--whatsapp-hover);
+  --color-whatsapp-foreground: var(--whatsapp-foreground);
+  --color-footer-border: var(--footer-border);
   --color-footer: var(--footer);
   --color-footer-foreground: var(--footer-foreground);
   --color-footer-muted: var(--footer-muted);
 
   /* Radius: 8px default, 4px for chips and badges */
   --radius-sm: 0.25rem;
-  --radius-md: calc(var(--radius) * 0.75);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
@@ -177,6 +179,10 @@
   --border: #dce2f7;
   --input: #717970;
   --ring: #14532d;
+  /* Focus ring on dark surfaces (footer, green bands): 7:1+ against primary / footer */
+  --ring-inverse: #b1f2be;
+  --whatsapp-foreground: #ffffff;
+  --footer-border: rgb(255 255 255 / 0.12);
 
   --footer: #141b2b;
   --footer-foreground: #edf0ff;
@@ -216,6 +222,11 @@
   :where(a, button, summary, select, input, textarea, [tabindex]):focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
   }
+}
+
+/* Put on dark containers so every focus indicator inside switches to the light ring. */
+@utility on-dark {
+  --ring: var(--ring-inverse);
 }
 
 @utility tabular {

@@ -20,7 +20,7 @@ type CartContextValue = {
   hydrated: boolean;
   count: number;
   add: (productId: string, productName: string, quantity?: number) => void;
-  setQuantity: (productId: string, quantity: number) => void;
+  setQuantity: (productId: string, productName: string, quantity: number) => void;
   remove: (productId: string, productName: string) => void;
   clear: () => void;
 };
@@ -58,7 +58,12 @@ export function CartProvider({
 }) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [announcement, setAnnouncement] = useState("");
+  // id changes on every message so identical messages ("Added X") are re-announced.
+  const [announcement, setAnnouncementState] = useState({ id: 0, text: "" });
+  const setAnnouncement = useCallback(
+    (text: string) => setAnnouncementState((prev) => ({ id: prev.id + 1, text })),
+    [],
+  );
 
   useEffect(() => {
     // Read once after mount so server and first client render match.
@@ -96,8 +101,9 @@ export function CartProvider({
         });
         setAnnouncement(`Added ${productName} to cart.`);
       },
-      setQuantity(productId, quantity) {
+      setQuantity(productId, productName, quantity) {
         update((prev) => prev.map((l) => (l.product_id === productId ? { ...l, quantity: clampQty(quantity) } : l)));
+        setAnnouncement(`Quantity for ${productName} set to ${clampQty(quantity)}.`);
       },
       remove(productId, productName) {
         update((prev) => prev.filter((l) => l.product_id !== productId));
@@ -108,14 +114,14 @@ export function CartProvider({
         setAnnouncement("Cart cleared.");
       },
     }),
-    [lines, hydrated, update],
+    [lines, hydrated, update, setAnnouncement],
   );
 
   return (
     <CartContext.Provider value={value}>
       {children}
       <p role="status" aria-live="polite" className="sr-only">
-        {announcement}
+        <span key={announcement.id}>{announcement.text}</span>
       </p>
     </CartContext.Provider>
   );

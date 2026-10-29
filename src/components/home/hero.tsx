@@ -7,7 +7,7 @@ import type { StoreSettings } from "@/types/store";
 
 export function Hero({ settings }: { settings: StoreSettings }) {
   return (
-    <section aria-labelledby="hero-title" className="relative isolate overflow-hidden bg-brand-deep text-primary-foreground">
+    <section aria-labelledby="hero-title" className="on-dark relative isolate overflow-hidden bg-brand-deep text-primary-foreground">
       <Image
         src="/images/placeholders/hero.svg"
         alt=""
@@ -31,7 +31,7 @@ export function Hero({ settings }: { settings: StoreSettings }) {
                 <ArrowRight />
               </Link>
             </Button>
-            <Button asChild variant="outline" className="h-11 border-white/60 bg-transparent text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
+            <Button asChild variant="outline" className="h-11 border-primary-foreground/60 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
               <a href={whatsappHref(settings.whatsapp_number)} target="_blank" rel="noopener noreferrer">
                 <MessageCircle />
                 Ask on WhatsApp

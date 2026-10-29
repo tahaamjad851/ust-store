@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Form from "next/form";
-import { Heart, Menu, Search, Tractor, User } from "lucide-react";
+import { Menu, Phone, Search, Tractor, User } from "lucide-react";
 import { CartLink } from "@/components/cart/cart-link";
+import { telHref } from "@/lib/contact";
 import type { StoreSettings } from "@/types/store";
 import { CategoryDrawerTrigger } from "./category-drawer";
 
@@ -51,24 +52,24 @@ export function SiteHeader({ settings }: { settings: StoreSettings }) {
               type="search"
               maxLength={100}
               placeholder="Search by part name, SKU or tractor model"
-              className="h-11 w-full rounded-lg border border-input bg-card pr-3 pl-10 text-body-md placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              className="h-11 w-full rounded-lg border border-input bg-card pr-3 pl-10 text-body-lg md:text-body-md placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
             />
           </div>
         </Form>
 
-        <nav aria-label="Account" className="flex items-center gap-1 lg:col-start-4">
+        <nav aria-label="Shortcuts" className="flex items-center gap-1 lg:col-start-4">
           <Link href="/account" prefetch={false} className={`${iconLink} hidden sm:inline-flex`} aria-label="Account">
             <User className="size-5" aria-hidden="true" />
             <span className="hidden text-label-lg lg:inline" aria-hidden="true">
               Account
             </span>
           </Link>
-          <Link href="/wishlist" prefetch={false} className={`${iconLink} inline-flex`} aria-label="Wishlist">
-            <Heart className="size-5" aria-hidden="true" />
-            <span className="hidden text-label-lg lg:inline" aria-hidden="true">
-              Wishlist
+          <a href={telHref(settings.phone_primary)} className={`${iconLink} inline-flex`} aria-label={`Call ${settings.phone_primary}`}>
+            <Phone className="size-5" aria-hidden="true" />
+            <span className="hidden text-label-lg tabular lg:inline" aria-hidden="true">
+              Call us
             </span>
-          </Link>
+          </a>
           <CartLink />
         </nav>
       </div>

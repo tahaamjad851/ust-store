@@ -22,7 +22,7 @@ export function SortSelect({
         form={formId}
         defaultValue={value}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="h-11 rounded-lg border border-input bg-card px-3 text-body-md"
+        className="h-11 rounded-lg border border-input bg-card px-3 text-body-lg md:text-body-md"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

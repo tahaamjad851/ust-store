@@ -56,9 +56,10 @@ export default async function HomePage() {
 
       <section aria-labelledby="categories-title" className={`${container} py-10`}>
         <SectionHeading id="categories-title" title="Shop by category" link={{ href: "/shop", label: "All products" }} />
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {/* Phones: compact scrolling chip row (mobile design). sm and up: tile grid. */}
+        <ul className="-mx-margin flex gap-2 overflow-x-auto px-margin pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
           {tree.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="shrink-0 sm:shrink">
               <CategoryTile category={c} href={`/categories/${c.slug}`} />
             </li>
           ))}
@@ -81,7 +82,7 @@ export default async function HomePage() {
       </section>
 
       {fluids.length > 0 && (
-        <section aria-labelledby="fluids-title" className="bg-primary py-10 text-primary-foreground">
+        <section aria-labelledby="fluids-title" className="on-dark bg-primary py-10 text-primary-foreground">
           <div className={container}>
             <SectionHeading
               id="fluids-title"
@@ -90,7 +91,7 @@ export default async function HomePage() {
               description="Engine oils, gear oils and hydraulic fluids for tractors."
               link={{ href: "/categories/engine-oils", label: "View oils" }}
             />
-            <ul className="grid grid-cols-2 gap-3 text-foreground lg:grid-cols-4">
+            <ul className="grid grid-cols-2 gap-3 text-foreground md:grid-cols-3">
               {fluids.map((p) => (
                 <li key={p.id} className="flex">
                   <ProductCard product={p} />
@@ -163,7 +164,7 @@ export default async function HomePage() {
         <Faq settings={settings} />
         <p className="mt-4 text-center text-body-md text-muted-foreground">
           More questions?{" "}
-          <a href={wa} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+          <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-primary underline">
             Message us on WhatsApp<span className="sr-only"> (opens in a new tab)</span>
           </a>
         </p>

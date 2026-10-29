@@ -25,7 +25,7 @@ export function ProductPurchase({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <QuantityStepper value={qty} onChange={setQty} max={max} label={`Quantity for ${productName}`} />
+      <QuantityStepper value={qty} onChange={setQty} max={max} disabled={outOfStock} label={`Quantity for ${productName}`} />
       <AddToCartButton
         productId={productId}
         productName={productName}

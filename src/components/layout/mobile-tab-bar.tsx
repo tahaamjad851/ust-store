@@ -22,8 +22,8 @@ export function MobileTabBar() {
             Categories
           </CategoryDrawerTrigger>
         </li>
-        <li className="flex flex-1 items-center justify-center">
-          <CartLink />
+        <li className="flex flex-1">
+          <CartLink variant="tab" className={tab} />
         </li>
         <li className="flex flex-1">
           <Link href="/account" prefetch={false} className={tab}>
