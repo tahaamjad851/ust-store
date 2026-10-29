@@ -26,7 +26,7 @@ export function MobileTabBar() {
           <CartLink />
         </li>
         <li className="flex flex-1">
-          <Link href="/account" className={tab}>
+          <Link href="/account" prefetch={false} className={tab}>
             <User className="size-5" aria-hidden="true" />
             Account
           </Link>

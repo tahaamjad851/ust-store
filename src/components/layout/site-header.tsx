@@ -57,13 +57,13 @@ export function SiteHeader({ settings }: { settings: StoreSettings }) {
         </Form>
 
         <nav aria-label="Account" className="flex items-center gap-1 lg:col-start-4">
-          <Link href="/account" className={`${iconLink} hidden sm:inline-flex`} aria-label="Account">
+          <Link href="/account" prefetch={false} className={`${iconLink} hidden sm:inline-flex`} aria-label="Account">
             <User className="size-5" aria-hidden="true" />
             <span className="hidden text-label-lg lg:inline" aria-hidden="true">
               Account
             </span>
           </Link>
-          <Link href="/wishlist" className={`${iconLink} inline-flex`} aria-label="Wishlist">
+          <Link href="/wishlist" prefetch={false} className={`${iconLink} inline-flex`} aria-label="Wishlist">
             <Heart className="size-5" aria-hidden="true" />
             <span className="hidden text-label-lg lg:inline" aria-hidden="true">
               Wishlist

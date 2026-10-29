@@ -14,7 +14,7 @@ export type DrawerCategory = Pick<Category, "id" | "slug" | "name" | "icon"> & {
   children: Pick<Category, "id" | "slug" | "name" | "icon">[];
 };
 
-const DrawerContext = createContext<(() => void) | null>(null);
+const DrawerContext = createContext<((trigger: HTMLElement) => void) | null>(null);
 
 const rowClass =
   "flex min-h-12 w-full items-center gap-3 border-b border-border px-4 py-3 text-left text-label-lg text-foreground hover:bg-surface-low focus-visible:-outline-offset-2";
@@ -34,6 +34,8 @@ export function CategoryDrawerProvider({
   const [activeId, setActiveId] = useState<string | null>(null);
   const backRef = useRef<HTMLButtonElement>(null);
   const parentRefs = useRef(new Map<string, HTMLButtonElement>());
+  // Triggers live outside Radix (header and tab bar), so focus is returned to them by hand.
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const active = categories.find((c) => c.id === activeId) ?? null;
 
@@ -56,10 +58,26 @@ export function CategoryDrawerProvider({
   const close = () => onOpenChange(false);
 
   return (
-    <DrawerContext.Provider value={() => setOpen(true)}>
+    <DrawerContext.Provider
+      value={(trigger) => {
+        triggerRef.current = trigger;
+        setOpen(true);
+      }}
+    >
       {children}
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="left" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
+        <SheetContent
+          side="left"
+          showCloseButton={false}
+          className="w-full gap-0 p-0 sm:max-w-sm"
+          onCloseAutoFocus={(e) => {
+            // Return focus to whichever button (header or tab bar) opened the drawer.
+            if (triggerRef.current?.isConnected) {
+              e.preventDefault();
+              triggerRef.current.focus();
+            }
+          }}
+        >
           <SheetDescription className="sr-only">Browse products by category</SheetDescription>
           {active ? (
             <>
@@ -183,7 +201,7 @@ export function CategoryDrawerTrigger({ className, children }: { className?: str
   const open = useContext(DrawerContext);
   if (!open) throw new Error("CategoryDrawerTrigger must be used inside <CategoryDrawerProvider>");
   return (
-    <button type="button" onClick={open} aria-haspopup="dialog" className={className}>
+    <button type="button" onClick={(e) => open(e.currentTarget)} aria-haspopup="dialog" className={className}>
       {children}
     </button>
   );
