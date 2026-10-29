@@ -19,7 +19,8 @@ This file is the single source of truth for phase status and decisions. The prod
 |---|---|---|
 | 0. Setup | main | Done (`877385a`) |
 | UI foundation (storefront pages from Stitch, DEMO data) | feat/ui-foundation | Done, merged to main (`c10c9a9`) |
-| 1. Database | feat/database | In progress |
+| 1. Database | feat/database | Built and reviewed; waiting for the user to push to the dev project and run `npm run test:db` |
+| 2. Auth | feat/auth | Proposed (below), waiting for "go" |
 
 ## Decisions
 
@@ -47,8 +48,44 @@ Scope: Supabase schema, RLS, transactional functions, storage, DEMO seed, databa
 - Functions: `place_order()`, `adjust_stock()`, `set_order_status()`, `set_payment_status()`, `expire_unpaid_bank_transfers()`, tracking-token and bank-detail lookups, stock availability.
 - `supabase/seed.sql`: DEMO data matching `src/lib/mock/`.
 - `src/lib/supabase/admin.ts` (service-role client, `server-only`).
-- Tests in `tests/db/` run against the dev project (`npm run test:db`).
+- Tests in `tests/integration/db/` run against the dev project (`npm run test:db`).
 - `docs/DATABASE.md`.
+
+### Phase 1 report (2026-10-29)
+
+Built: 9 migrations (41 tables, RLS on all, 20+ functions), storage buckets and policies, DEMO seed generated from `src/lib/mock` (`npm run db:seed:generate`), `src/lib/supabase/admin.ts`, 25 dev-project tests, `docs/DATABASE.md`. Wholesale pricing removed from the UI layer; demo categories aligned with decision 7.
+
+Tested so far:
+- All migrations and the seed were executed on a local Postgres 17 (PGlite) with stubbed Supabase `auth`/`storage` schemas; 58 SQL-level checks pass (RLS isolation, privileges, place_order validation/idempotency/price recomputation/anti-hoarding, coupons, shipping, lifecycle, release-once, ledger = inventory, bank-transfer expiry, returns, storage policies, hardening guards). This harness lives outside the repo.
+- Not yet run against Supabase: `supabase db push` and `npm run test:db` (concurrency, real PostgREST/Auth behaviour). The user runs these.
+- Reviews: db-architect and security-reviewer; all critical/high/medium findings fixed.
+
+Low findings left open:
+- Customers see `order_status_history.note`/`actor_id` and `payments.verified_by` on their own orders (notes are documented as customer-facing; internal remarks go in `internal_notes`).
+- Coupon per-customer limits key on account or phone; phones are not verified, so a guest can bypass them by changing the number.
+- `stock_availability()` shows exact available quantities to anyone.
+- No per-order cap on payment-proof uploads (server-side limit planned for Phase 4); MIME type is client-declared.
+- Refund amounts are not capped against the order total in the database (admin UI / function in Phase 6).
+- Re-running the seed fails if an admin created rows with the same slug/SKU under other ids, and resets DEMO values (documented: never `--include-seed` in production).
+- COD orders never auto-expire (staff cancel stale ones; open-order cap limits abuse).
+- `npm audit`: 3 low (deepmerge via the `shadcn` dev CLI), pre-existing.
+
+## Phase 2: Auth (proposal)
+
+Branch `feat/auth`. Supabase Auth with email + password, wired into the existing UI. Catalog stays on mock data (Phase 3).
+
+- `src/proxy.ts` session refresh with `@supabase/ssr`; `src/lib/auth`: `getUser()`, `requireUser()`, `requireStaff()`/`requireAdmin()` (server-side, via `is_admin()`/`is_full_admin()`), used by `/account` and `/admin` layouts.
+- `(auth)` routes: register, login, logout, forgot password, reset password, email confirmation callback; react-hook-form + zod; generic error messages (no account enumeration).
+- `/account`: minimal profile page (name, phone, company) using the column-limited profile update; header Account link becomes live.
+- `/admin`: protected shell only (403 for customers, redirect for guests).
+- Disabled accounts: blocked at sign-in and on every protected request; admin "disable" will also ban the user in Supabase Auth (service role, Phase 6 UI).
+- Tests: unit (schemas), Playwright e2e (register → confirm link via test mailbox or admin-created user, login, logout, reset; `/account` and `/admin` redirects; customer gets 403 on `/admin`).
+
+Decisions needed before "go":
+1. Auth page design: Stitch has no login/register screens. Build them in the existing design language, or provide designs?
+2. Email delivery: Supabase's built-in mailer is heavily rate-limited (a few emails/hour). Use a custom SMTP provider (e.g. Resend) now, or later?
+3. Sign-in methods: email + password only, or also phone OTP / Google?
+4. Rate limiting for the Next.js server actions (guest checkout later): a Postgres-backed limiter (no new service) or Upstash Redis?
 
 ## Phase 0: Setup
 
