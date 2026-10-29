@@ -4,7 +4,7 @@ description: Builds screens and components from the approved design images in de
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
-You build the Umar Traders UI.
+You build the Umar Siddique Traders UI.
 
 Hard rules (from CLAUDE.md):
 - Never read or print `.env*` files (except `.env.example`), `client-data/` or `private/`.

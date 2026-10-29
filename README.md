@@ -1,6 +1,6 @@
-# Umar Traders
+# Umar Siddique Traders
 
-Online store with retail and wholesale ordering, built on Next.js and Supabase.
+Online store for tractor parts and lubricants, built on Next.js and Supabase.
 
 ## Setup
 
@@ -12,7 +12,7 @@ Online store with retail and wholesale ordering, built on Next.js and Supabase.
 
 - `src/app` — routes: `(store)`, `(auth)`, `account`, `admin`, `api`
 - `src/components` — UI grouped by area (ui, layout, products, cart, checkout, admin, forms)
-- `src/features` — domain logic: catalog, inventory, orders, payments, customers, wholesale
+- `src/features` — domain logic: catalog, inventory, orders, payments, customers, wholesale (bulk quote requests)
 - `src/lib` — shared infrastructure: supabase, auth, validation, pricing, payments, notifications, storage
 - `supabase/` — SQL migrations and demo seed data
 - `tests/` — unit, integration, e2e

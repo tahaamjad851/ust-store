@@ -1,0 +1,1271 @@
+# MASTER PROMPT: BUILD A COMPLETE, PROFESSIONAL TRACTOR SPARE PARTS & LUBRICANTS E-COMMERCE WEBSITE
+
+Act as a senior full-stack software engineer, UI/UX designer, e-commerce architect, database engineer, cybersecurity specialist, and DevOps engineer.
+
+I want you to DESIGN, DEVELOP, TEST, AND PREPARE FOR DEPLOYMENT a complete, modern, production-oriented e-commerce website for my tractor spare parts, agricultural machinery parts, engine oils, lubricants, and related automotive products business in Pakistan.
+
+This is a real business project, not a demo, static template, or simple frontend assignment. I want a functional online store where customers can browse products, create accounts, place orders, select payment methods, and track their purchases. I also need a secure admin dashboard where I can manage the complete business without editing code.
+
+Do not stop after creating a homepage or a UI prototype. Build the complete application, including frontend, backend, database, authentication, inventory, checkout, order management, and integrations.
+
+## 1. BUSINESS INFORMATION
+
+Use these initial placeholders and make them easy to change later:
+
+Business name: [Umar Siddique Traders]
+Business type: Tractor Spare Parts, Agricultural Machinery Parts, Engine Oils & Lubricants
+Country: Pakistan
+Primary currency: PKR (Pakistani Rupee)
+Primary language: English
+Secondary language: Urdu
+Initial market: Pakistan
+Contact number: [0300 6701477 , 03218219594]
+WhatsApp number: [03006701477 , 03218219594]
+Business address: [Quaid-e-Millat Road Khanpur]
+Business email: [umarsiddiquetraders@gmail.com]
+Logo: Use a professional temporary text logo until I provide my actual logo.
+
+Create the website so it can later support wholesale customers, retail customers, mechanics, workshops, tractor dealers, agricultural businesses, and distributors.
+
+Do not invent actual business information, product certifications, official brand partnerships, payment credentials, or customer reviews.
+
+## 2. DESIGN INSPIRATION AND BRAND IDENTITY
+
+Use these websites as design references:
+
+1. https://www.junaidjamshed.com
+2. https://glintandglam.pk
+3. https://www.logoofficial.com
+4. https://alfatah.pk
+
+Study their general e-commerce structure, product presentation, category navigation, search experience, product detail layouts, cart interactions, and responsive design where accessible.
+
+Do not copy their branding, source code, logos, images, or exact layouts. Create an original design suitable for an agricultural machinery and automotive parts business.
+
+### Visual direction
+
+Build a premium industrial and automotive-inspired design with:
+
+- Deep forest green or dark green as the primary brand color.
+- Charcoal, white, light grey, and restrained metallic accents.
+- Clear typography and excellent readability.
+- High-quality product photography.
+- Professional product cards with clear prices and stock indicators.
+- Consistent spacing, shadows, borders, and rounded corners.
+- Subtle animations and smooth transitions.
+- A professional, trustworthy industrial appearance.
+- Accessible color contrast.
+- Consistent icons throughout the interface.
+
+The website must feel like a serious, established Pakistani spare parts and lubricant retailer.
+
+Avoid excessive gradients, unnecessary animations, cluttered layouts, oversized empty sections, and generic AI-generated website styling.
+
+## 3. REQUIRED TECHNOLOGY STACK
+
+Use a modern, maintainable full-stack architecture.
+
+Preferred stack:
+
+Frontend:
+- Next.js using the App Router.
+- React.
+- TypeScript.
+- Tailwind CSS.
+- A consistent component library such as shadcn/ui.
+- Lucide icons.
+
+Backend and database:
+- Supabase PostgreSQL.
+- Supabase Authentication.
+- Supabase Storage for product images.
+- Server-side operations using Next.js server actions or route handlers.
+- Database migrations and appropriate indexes.
+
+Forms and validation:
+- React Hook Form.
+- Zod validation.
+
+Additional tools:
+- A suitable charting library for admin analytics.
+- An appropriate image optimization solution.
+- A maintained email service integration for order notifications, if credentials are configured.
+- A suitable testing framework for unit and end-to-end tests.
+
+Deployment:
+- Vercel or another compatible hosting platform.
+- Supabase for the database, authentication, and storage.
+
+Use stable, mutually compatible package versions. Do not use deprecated packages or unnecessary dependencies.
+
+If a different stack is genuinely more appropriate, explain why before changing the architecture.
+
+## 4. COMPLETE WEBSITE STRUCTURE
+
+Create all necessary routes and pages.
+
+### Public storefront
+
+- Home page.
+- Shop All Products.
+- Categories.
+- Subcategories.
+- Product details.
+- Search results.
+- Brand directory.
+- Brand-specific product pages.
+- Offers and promotions.
+- New arrivals.
+- Best sellers, based only on actual order data.
+- Related products.
+- Frequently asked questions.
+- About Us.
+- Contact Us.
+- Privacy Policy.
+- Terms and Conditions.
+- Shipping and Delivery Policy.
+- Returns and Refunds Policy.
+- Warranty Policy.
+- Order Tracking.
+- Login.
+- Register.
+- Forgot Password.
+- Customer Account.
+- Wishlist.
+- Shopping Cart.
+- Checkout.
+- Order Confirmation.
+- 404 page.
+
+### Main navigation menu
+
+Create a polished, responsive navigation bar containing:
+
+- Home.
+- Shop.
+- Tractor Parts.
+- Engine Oils.
+- Lubricants.
+- Hydraulic Oils.
+- Filters.
+- Tractor Accessories.
+- Brands.
+- Offers.
+- About Us.
+- Contact Us.
+
+Include:
+
+- A professional logo.
+- A prominent product search bar.
+- Account icon.
+- Wishlist icon.
+- Cart icon with a live item count.
+- Mobile hamburger menu.
+- Search suggestions.
+- A category mega menu on desktop.
+- Sticky header functionality where appropriate.
+
+Only display categories that are configured in the database. Make the menu editable through the admin panel where practical.
+
+## 5. HOMEPAGE DESIGN
+
+Create a high-quality homepage with these sections in order:
+
+1. Optional announcement bar for delivery, promotions, or business notices.
+2. Main header and navigation.
+3. Large hero banner showing tractor machinery, spare parts, or lubricants.
+4. Hero headline such as:
+   "Quality Tractor Parts & Lubricants You Can Trust"
+5. Supporting text emphasizing product quality, convenient ordering, and reliable service.
+6. Primary button: Shop Products.
+7. Secondary button: Explore Tractor Parts.
+8. Shop by Category.
+9. Featured Products.
+10. Popular Brands.
+11. Engine Oils and Lubricants section.
+12. Tractor Spare Parts section.
+13. Best Sellers, calculated from actual sales.
+14. Promotional banners.
+15. Why Choose Us.
+16. Wholesale and Bulk Orders section.
+17. Recently Viewed Products.
+18. Customer reviews, only when genuine reviews exist.
+19. Newsletter subscription, if email functionality is configured.
+20. Frequently Asked Questions.
+21. Footer with contact information, policies, social links, and navigation.
+
+Use realistic placeholder product data for initial development. Clearly distinguish demo data from verified business data.
+
+Make every visible button perform its intended action.
+
+## 6. PRODUCT CATEGORIES AND CATALOG
+
+Create an expandable category and subcategory system.
+
+Initial suggested categories:
+
+### Tractor Spare Parts
+- Engine Parts.
+- Clutch Parts.
+- Brake Parts.
+- Gearbox Parts.
+- Transmission Parts.
+- Hydraulic System Parts.
+- Steering Parts.
+- Cooling System Parts.
+- Electrical Parts.
+- Fuel System Parts.
+- Belts and Pulleys.
+- Bearings and Seals.
+- Tractor Body Parts.
+- Tractor Accessories.
+
+### Oils and Lubricants
+- Engine Oil.
+- Diesel Engine Oil.
+- Hydraulic Oil.
+- Transmission Oil.
+- Gear Oil.
+- Tractor Oil.
+- Grease.
+- Industrial Lubricants.
+- Coolants.
+- Other Fluids.
+
+### Filters and Maintenance
+- Oil Filters.
+- Air Filters.
+- Fuel Filters.
+- Hydraulic Filters.
+- Maintenance Products.
+
+These are starting categories only. The admin must be able to create, rename, reorder, nest, activate, deactivate, and delete categories safely.
+
+Support popular tractor makes and models as configurable data, such as Massey Ferguson, New Holland, Fiat, and other makes relevant to the business.
+
+Never assume that a part fits every tractor model.
+
+## 7. ADVANCED PRODUCT MANAGEMENT
+
+Every product must support the following fields where applicable:
+
+- Product name.
+- Unique SKU.
+- Barcode.
+- Product slug.
+- Short description.
+- Full description.
+- Product category and subcategory.
+- Manufacturer or brand.
+- Product type.
+- Product images.
+- Image gallery.
+- Purchase cost.
+- Regular selling price.
+- Sale price.
+- Tax configuration.
+- Current stock quantity.
+- Low-stock threshold.
+- Stock status.
+- Weight and dimensions.
+- Packaging information.
+- Warranty information.
+- Return eligibility.
+- Product specifications.
+- Part number.
+- OEM or compatible part numbers.
+- Tractor make compatibility.
+- Tractor model compatibility.
+- Model year or production range, if relevant.
+- Oil viscosity grade.
+- Oil specifications and certifications, where verified.
+- Product origin, where verified.
+- Featured product status.
+- Publication status.
+- SEO title and description.
+- Created date and updated date.
+
+Support products with variations, such as different sizes, packaging volumes, grades, and compatible models.
+
+Each variation must have its own SKU and inventory tracking where appropriate.
+
+Allow the admin to upload, replace, reorder, and remove product images.
+
+Build product import and export using CSV, with validation, error reporting, and duplicate SKU protection.
+
+Product deletion must not destroy historical order records. Use archiving or safe deletion rules.
+
+## 8. PRODUCT LISTING AND SEARCH
+
+Implement a fully functional catalog.
+
+Customers must be able to:
+
+- Browse all products.
+- Browse categories and subcategories.
+- Search by product name.
+- Search by SKU.
+- Search by part number.
+- Search by brand.
+- Search by tractor make and model.
+- Filter by category.
+- Filter by price range.
+- Filter by brand.
+- Filter by availability.
+- Filter by specifications.
+- Sort by price, newest, relevance, and popularity.
+- Switch between grid and list views.
+- Change products per page.
+- Navigate using pagination.
+- Clear filters.
+- View active filters.
+- Add items to their wishlist.
+- Add products to the cart.
+
+Use server-side pagination and database queries for larger catalogs.
+
+Show a useful empty state when no products match the search.
+
+## 9. PRODUCT DETAIL PAGE
+
+Each product page should include:
+
+- Product image gallery.
+- Zoom or enlarged image view.
+- Product name.
+- SKU and part number.
+- Brand.
+- Price and sale price.
+- Stock availability.
+- Quantity selector.
+- Add to Cart button.
+- Buy Now button.
+- Add to Wishlist button.
+- Product description.
+- Specifications.
+- Compatibility information.
+- Available variations.
+- Delivery information.
+- Warranty and return information.
+- Related products.
+- Recently viewed products.
+- Reviews and ratings.
+- WhatsApp inquiry option.
+
+For tractor parts, display compatibility prominently.
+
+For oils, display viscosity grade, container size, intended application, and verified specifications where available.
+
+Prevent customers from purchasing unavailable variations or quantities exceeding available stock.
+
+## 10. SHOPPING CART
+
+Build a fully functional shopping cart.
+
+Required functionality:
+
+- Add to cart.
+- Remove items.
+- Update quantities.
+- Change product variations.
+- Display product images.
+- Display product names and SKUs.
+- Show individual prices.
+- Show line totals.
+- Calculate subtotal.
+- Apply eligible discounts.
+- Apply coupon codes.
+- Calculate delivery charges.
+- Display applicable taxes.
+- Calculate the final total.
+- Show free-delivery eligibility when configured.
+- Continue shopping.
+- Proceed to checkout.
+- Handle unavailable or changed stock.
+- Persist the cart across page refreshes.
+- Merge a guest cart with the authenticated user's cart after login where appropriate.
+
+Do not trust client-submitted prices, discount amounts, stock levels, or order totals. Recalculate everything on the server using current database values.
+
+## 11. COMPLETE CHECKOUT SYSTEM
+
+Build a multi-step or clearly organized checkout.
+
+Step 1: Customer information.
+- Full name.
+- Email.
+- Phone number.
+- Optional company name.
+
+Step 2: Delivery address.
+- House or shop number.
+- Street.
+- Area.
+- City.
+- Province.
+- Postal code where applicable.
+- Delivery instructions.
+
+Step 3: Delivery method.
+- Standard delivery.
+- Configurable alternative delivery methods.
+- Local pickup if enabled by the admin.
+
+Step 4: Payment method.
+- Cash on Delivery.
+- Bank transfer.
+- Online payment gateway.
+- Other enabled methods.
+
+Step 5: Order review.
+- Products.
+- Quantities.
+- Subtotal.
+- Discount.
+- Delivery charge.
+- Tax.
+- Final total.
+
+Step 6: Place Order.
+
+After a successful order, generate a unique order number and show an order confirmation page.
+
+Send an order confirmation email if email credentials are configured.
+
+Provide a WhatsApp order notification option when configured.
+
+Prevent duplicate orders caused by repeated button clicks, retries, or network problems.
+
+Reserve or deduct stock atomically to prevent overselling. Define appropriate rules for pending and cancelled orders.
+
+Never create a confirmed paid order merely because a customer reaches a success URL.
+
+## 12. PAKISTAN PAYMENT INTEGRATION
+
+Design a secure payment architecture suitable for a Pakistani business.
+
+### Cash on Delivery
+- Allow customers to select COD.
+- Record the payment method.
+- Mark the payment as unpaid until collected.
+- Allow the admin to update payment status.
+
+### Bank Transfer
+- Display configurable bank account title, bank name, account number or IBAN, and payment instructions.
+- Allow customers to submit a transaction reference.
+- Optionally allow payment proof uploads.
+- Mark payments as pending verification.
+- Let an authorized admin verify or reject the payment.
+- Never automatically mark a bank transfer as paid based solely on a customer-provided reference or screenshot.
+
+### Online payment gateway
+Create a modular payment provider interface.
+
+Evaluate a suitable Pakistan-supported provider, such as Safepay, PayFast, or another currently supported provider, based on merchant eligibility, current documentation, fees, and required credentials.
+
+Implement a real integration only when the provider and merchant credentials are available.
+
+Requirements:
+- Server-side payment session creation.
+- Secure payment initiation.
+- Signature or webhook verification according to the provider's documentation.
+- Idempotent payment processing.
+- Transaction references.
+- Payment status updates.
+- Failed and cancelled payment handling.
+- Refund status support.
+- Proper currency handling in PKR.
+- No storage of raw card details.
+- No fake payment success screens.
+
+If credentials are missing, implement a clearly labeled sandbox or setup mode and provide exact configuration instructions.
+
+Do not claim that the website is accepting live online payments until the integration has been configured and tested with the merchant account.
+
+## 13. SECURE ADMIN PORTAL
+
+Create a dedicated admin area at /admin.
+
+Admin access must be protected by server-side authorization and role-based permissions. Hiding admin links in the UI is not sufficient.
+
+Create an initial secure admin setup process. Do not hardcode a production administrator password or expose service-role credentials.
+
+### Admin dashboard
+
+Display real database statistics:
+
+- Total sales.
+- Today's sales.
+- Sales over a selected period.
+- Total orders.
+- Pending orders.
+- Processing orders.
+- Shipped orders.
+- Delivered orders.
+- Cancelled orders.
+- Total customers.
+- Total products.
+- Low-stock products.
+- Out-of-stock products.
+- Best-selling products.
+- Recent orders.
+- Sales charts.
+- Order trends.
+- Payment status summaries.
+
+Clearly distinguish gross sales, discounts, refunds, and net sales.
+
+Do not generate fake dashboard statistics once real data is available.
+
+### Product management
+- Add products.
+- Edit products.
+- Archive products.
+- Upload product images.
+- Manage categories.
+- Manage brands.
+- Manage product variations.
+- Update prices.
+- Set sale prices.
+- Manage SKUs.
+- Update stock.
+- Manage compatibility.
+- Import and export products.
+
+### Inventory management
+- View current stock.
+- Receive new stock.
+- Record stock adjustments.
+- Track damaged goods.
+- Track returned stock.
+- Record inventory movements.
+- Configure low-stock alerts.
+- Configure out-of-stock alerts.
+- View inventory history.
+- Filter inventory by category, brand, and stock level.
+- Support reorder levels.
+
+Maintain a stock movement ledger containing product, variation, quantity change, reason, timestamp, and authorized user.
+
+### Order management
+- View all orders.
+- Search by order number.
+- Filter by date, customer, payment method, payment status, and order status.
+- View complete order details.
+- Update fulfillment status.
+- Record shipment and tracking details.
+- Add internal notes.
+- Print order invoices.
+- Download invoices as PDF.
+- Cancel orders under defined rules.
+- Process eligible returns and refunds.
+- View order history.
+
+Use a controlled order lifecycle, for example:
+Pending → Confirmed → Processing → Shipped → Delivered.
+
+Support cancellation and return workflows without allowing invalid status transitions.
+
+### Customer management
+- View customers.
+- Search customers.
+- View order history.
+- View customer addresses.
+- View total purchases.
+- Manage customer support notes.
+- Disable accounts when authorized and legally appropriate.
+
+Do not expose customer passwords or sensitive payment information.
+
+### Promotions
+- Create coupon codes.
+- Set percentage discounts.
+- Set fixed-amount discounts.
+- Configure start and end dates.
+- Set minimum order values.
+- Set usage limits.
+- Limit coupons to specific categories or products.
+- Restrict coupons to eligible customer groups.
+- Enable or disable promotions.
+
+### Additional settings
+- Business name and logo.
+- Contact details.
+- Store address.
+- Social links.
+- Currency.
+- Delivery charges.
+- Free-delivery threshold.
+- Tax settings.
+- Return policy.
+- Invoice settings.
+- Homepage banners.
+- Featured products.
+- Navigation menu.
+- Payment methods.
+- Order notification settings.
+
+Record important administrative actions in an audit log.
+
+## 14. CUSTOMER PORTAL
+
+Create a secure customer account area at /account.
+
+Customers must be able to:
+
+- Register.
+- Log in and log out.
+- Reset forgotten passwords.
+- Verify email when configured.
+- Manage their profile.
+- Manage delivery addresses.
+- View order history.
+- View individual order details.
+- Track order status.
+- View payment status.
+- Download invoices.
+- Reorder previous purchases.
+- Manage their wishlist.
+- View recently viewed products.
+- Submit product reviews for eligible purchases.
+- Request cancellation where allowed.
+- Request returns where eligible.
+- Contact customer support.
+
+Customers must never be able to access another customer's orders, addresses, or account data.
+
+Provide guest checkout as a configurable option.
+
+## 15. WHOLESALE AND BULK ORDERING
+
+Wholesale sales are important for tractor spare parts and lubricant businesses.
+
+Create a wholesale inquiry and account application system.
+
+Features:
+- Wholesale account registration request.
+- Business or shop name.
+- Contact person.
+- Phone and email.
+- Business address.
+- Relevant business information.
+- Admin approval or rejection.
+- Wholesale customer role.
+- Customer-specific pricing or approved price lists.
+- Minimum order quantities.
+- Bulk quantity ordering.
+- Quote request for large orders.
+- Quote status tracking.
+- Optional purchase order reference.
+- Special pricing rules.
+- Wholesale order history.
+
+Never allow an unapproved user to access restricted wholesale pricing.
+
+If customer-specific pricing is implemented, make sure the correct price is calculated on the server during cart validation and checkout.
+
+## 16. ORDER TRACKING AND DELIVERY
+
+Build an order tracking page.
+
+Customers should be able to track their orders using an authenticated account or a secure tracking link with an unguessable token.
+
+Show:
+- Order placed.
+- Order confirmed.
+- Processing.
+- Dispatched.
+- Shipped.
+- Delivered.
+- Cancelled, where applicable.
+
+Include:
+- Courier name.
+- Tracking number.
+- Dispatch date.
+- Estimated delivery information when available.
+- Delivery notes.
+
+Do not invent live courier tracking data. Provide a configurable manual tracking system first and integrate a courier API only when credentials and documentation are available.
+
+## 17. DATABASE DESIGN
+
+Design a normalized PostgreSQL schema with proper constraints, relationships, indexes, and migrations.
+
+At minimum, evaluate the need for these tables:
+
+- profiles
+- user_roles
+- addresses
+- categories
+- brands
+- products
+- product_images
+- product_variants
+- product_compatibility
+- inventory
+- inventory_movements
+- carts
+- cart_items
+- wishlists
+- wishlist_items
+- orders
+- order_items
+- order_addresses or order address snapshots
+- payments
+- payment_events
+- shipments
+- coupons
+- coupon_redemptions
+- reviews
+- wholesale_applications
+- quotes
+- returns
+- refunds
+- notifications
+- store_settings
+- audit_logs
+
+Add other tables when the business logic requires them.
+
+Important requirements:
+- Use UUIDs or appropriate secure identifiers.
+- Add foreign keys and database constraints.
+- Use unique constraints for SKUs and order numbers.
+- Store money using integer minor units or a carefully defined fixed-precision decimal strategy.
+- Never use floating-point arithmetic for financial calculations.
+- Save product name, SKU, unit price, and relevant product details as order-item snapshots.
+- Save the delivery address as an order snapshot.
+- Preserve historical order and invoice information when products change.
+- Track created_at and updated_at where appropriate.
+- Use indexes for frequent searches.
+- Implement migrations.
+- Use transactions for order placement, inventory updates, and payment state changes.
+- Prevent duplicate payment events and duplicate stock movements.
+- Apply appropriate retention and privacy rules.
+
+Use Supabase Row Level Security policies to restrict access to each user's data and protect administrative operations.
+
+Never rely solely on frontend checks for security.
+
+## 18. AUTHENTICATION AND SECURITY
+
+Implement robust security practices:
+
+- Secure authentication.
+- Server-side role checks.
+- Least-privilege access.
+- Supabase Row Level Security.
+- Protected admin routes.
+- Validated server-side input.
+- Safe file upload validation.
+- Secure environment variable handling.
+- Rate limiting for sensitive endpoints.
+- Protection against unauthorized record access.
+- Appropriate CSRF protections where relevant.
+- XSS prevention.
+- SQL injection prevention through safe database access.
+- Secure payment webhook validation.
+- Idempotent order and payment operations.
+- Safe error messages.
+- Login and password-reset abuse protections.
+- Audit logging for important administrative operations.
+
+Do not put secrets in frontend code or commit them to version control.
+
+Never expose the Supabase service-role key, payment secret keys, email API keys, or other server secrets in the browser.
+
+Create an .env.example containing placeholder names only.
+
+## 19. IMAGE MANAGEMENT
+
+Create a professional product image workflow.
+
+Use Supabase Storage or another compatible image storage service.
+
+Requirements:
+- Upload images from the admin panel.
+- Preview images before saving.
+- Validate file type and size.
+- Support multiple images per product.
+- Select a primary image.
+- Reorder the gallery.
+- Replace or remove images.
+- Optimize image sizes.
+- Generate suitable responsive image variants where practical.
+- Use descriptive alt text.
+- Avoid layout shifts while images load.
+
+Use legitimate product images or clearly labeled placeholders during development.
+
+Do not scrape protected images from the reference websites or imply that placeholder images are official product photography.
+
+## 20. WHATSAPP AND CUSTOMER SUPPORT
+
+Add WhatsApp contact functionality.
+
+Features:
+- Floating WhatsApp contact button.
+- Contact Us page.
+- Product-specific WhatsApp inquiry.
+- Pre-filled inquiry message including product name and SKU.
+- Optional order inquiry message.
+- Configurable business number.
+- Customer support details.
+
+Ensure that the contact number is configurable through the admin settings.
+
+Do not claim WhatsApp messages have been sent or received unless an actual integration confirms it.
+
+## 21. INVOICES AND BUSINESS DOCUMENTS
+
+Create professional printable invoices.
+
+Invoice information:
+- Business logo and name.
+- Business contact details.
+- Invoice number.
+- Order number.
+- Invoice date.
+- Customer name.
+- Customer phone.
+- Billing and shipping address.
+- Product names.
+- SKUs.
+- Quantities.
+- Unit prices.
+- Discounts.
+- Tax, if applicable.
+- Delivery charges.
+- Grand total.
+- Payment method.
+- Payment status.
+- Order status.
+- Return policy.
+- Optional authorized signature area.
+
+Invoices should be printable and downloadable as PDF.
+
+Use a reliable PDF generation method. Recalculate or retrieve trusted server-side order totals and preserve the historical invoice information.
+
+## 22. SEO AND PERFORMANCE
+
+Implement:
+
+- Clean URLs.
+- Descriptive product slugs.
+- Unique page titles and meta descriptions.
+- Canonical URLs where appropriate.
+- XML sitemap.
+- robots.txt.
+- Open Graph metadata.
+- Product structured data.
+- Breadcrumb structured data.
+- Organization or local business structured data when accurate.
+- Proper image alt text.
+- Semantic HTML.
+- Accessible forms.
+- Keyboard navigation.
+- Responsive images.
+- Lazy loading where appropriate.
+- Pagination.
+- Database query optimization.
+- Caching where safe.
+- Error boundaries.
+- Loading states.
+- Empty states.
+- Useful 404 pages.
+
+Do not cache private account information or user-specific prices across customers.
+
+Aim for strong Core Web Vitals and good Lighthouse performance without sacrificing functionality.
+
+## 23. MOBILE RESPONSIVENESS
+
+The website must work correctly on:
+
+- Desktop computers.
+- Laptops.
+- Tablets.
+- Android phones.
+- iPhones.
+
+Implement:
+- Responsive navigation.
+- Mobile-friendly search.
+- Responsive product grids.
+- Touch-friendly controls.
+- Clear cart interactions.
+- Readable checkout forms.
+- Responsive admin tables.
+- Mobile-friendly order management.
+- Accessible dialogs and menus.
+
+Do not simply shrink the desktop interface. Design the mobile experience deliberately.
+
+## 24. URDU LANGUAGE SUPPORT
+
+Prepare the architecture for English and Urdu.
+
+Include:
+- Language switcher.
+- English interface.
+- Urdu interface.
+- Proper right-to-left layout in Urdu.
+- Correct text alignment.
+- Appropriate Urdu font support.
+- Correct placement of icons and navigation.
+- Consistent number and currency formatting.
+
+Product names and technical specifications should remain accurate. Do not automatically translate technical part numbers, SKUs, brand names, or viscosity grades.
+
+## 25. EMAIL AND NOTIFICATIONS
+
+Create notification workflows for:
+
+- Account registration.
+- Password reset.
+- Order confirmation.
+- Payment confirmation.
+- Payment failure.
+- Order dispatch.
+- Order delivery.
+- Cancellation.
+- Refund status.
+- Low-stock alerts.
+- Wholesale application updates.
+
+Use a configurable email provider.
+
+If credentials are missing, implement the notification service interface and provide setup instructions.
+
+Do not show a notification as successfully delivered unless the configured provider confirms the relevant operation.
+
+## 26. TESTING REQUIREMENTS
+
+Write meaningful automated tests.
+
+Unit tests:
+- Price calculations.
+- Discount calculations.
+- Tax calculations.
+- Delivery fee calculations.
+- Coupon validation.
+- Inventory calculations.
+- Product variation validation.
+- Order status transitions.
+- Payment status transitions.
+
+Integration tests:
+- Authentication.
+- Database authorization.
+- Product CRUD.
+- Image upload permissions.
+- Cart operations.
+- Order placement.
+- Stock reservation.
+- Payment webhook verification.
+- Cancellation and stock restoration.
+- Admin authorization.
+
+End-to-end tests:
+- Browse products.
+- Search for a product.
+- Filter by category.
+- Add a product to the cart.
+- Update quantity.
+- Apply a valid coupon.
+- Complete a COD checkout.
+- View the order in the customer account.
+- Log in as an administrator.
+- Create and update a product.
+- Update stock.
+- Process an order.
+- Confirm that unauthorized users cannot access admin pages or other customers' records.
+
+Use test data and sandbox integrations. Do not make real payments or send real customer communications during automated tests.
+
+## 27. INITIAL SAMPLE DATA
+
+Seed the database with clearly labeled demonstration data.
+
+Create examples for:
+- Tractor spare parts.
+- Engine oils.
+- Hydraulic oils.
+- Gear oils.
+- Grease.
+- Oil filters.
+- Air filters.
+- Fuel filters.
+- Tractor accessories.
+- Tractor Parts.
+- Tyres.
+- Radiator. 
+- Bike parts.
+- Cars parts.
+- Wires.
+- Electic Parts.
+- Hardware.
+
+Include realistic field structures such as SKU, price, stock quantity, specifications, and compatible tractor models.
+
+Do not represent invented product prices, official specifications, certifications, stock, or brand affiliations as verified facts.
+
+Make it easy for the administrator to replace or delete the demonstration data.
+
+## 28. PROJECT STRUCTURE
+
+Create a clean, modular, maintainable codebase.
+
+Use a structure similar to:
+
+src/
+  app/
+    (store)/
+    (auth)/
+    account/
+    admin/
+    api/
+  components/
+    layout/
+    navigation/
+    products/
+    cart/
+    checkout/
+    account/
+    admin/
+    forms/
+    ui/
+  features/
+    catalog/
+    inventory/
+    orders/
+    payments/
+    customers/
+    wholesale/
+  lib/
+    supabase/
+    auth/
+    validation/
+    pricing/
+    payments/
+    notifications/
+    storage/
+  services/
+  types/
+  hooks/
+
+supabase/
+  migrations/
+  seed.sql
+
+tests/
+  unit/
+  integration/
+  e2e/
+
+Include all required configuration files, package scripts, TypeScript configuration, linting configuration, and testing configuration.
+
+You may adjust the folder structure if another organization is more appropriate, but keep responsibilities clearly separated.
+
+## 29. IMPLEMENTATION RULES
+
+Follow these rules throughout the project:
+
+1. Do not build only a static frontend.
+2. Do not leave buttons non-functional.
+3. Do not use fake checkout success.
+4. Do not hardcode product listings as the permanent data source.
+5. Do not store orders only in browser state or localStorage.
+6. Do not hardcode administrator credentials.
+7. Do not expose secret keys.
+8. Do not trust client-side totals, permissions, stock, or payment status.
+9. Do not implement payment processing without proper verification.
+10. Do not invent live inventory, reviews, or analytics.
+11. Do not create unnecessary duplicate components.
+12. Do not silently ignore errors.
+13. Do not leave TODO comments in place of critical functionality.
+14. Do not claim an integration works until it has been tested.
+15. Do not replace an existing working feature with a placeholder during later implementation stages.
+16. Do not overwrite or delete existing project work without first understanding it.
+17. Follow current official documentation for external integrations.
+18. If credentials or third-party access are missing, implement what can safely be completed and explain the remaining setup.
+19. Keep the interface professional, consistent, and easy for a non-technical business owner to operate.
+20. Prioritize functional correctness, data security, and maintainability over decorative complexity.
+
+## 30. DEVELOPMENT WORKFLOW
+
+Work in the following phases.
+
+### Phase 1: Requirements and architecture
+- Inspect the available project files.
+- Establish the application architecture.
+- Define the database schema.
+- Define user roles and permissions.
+- Define product, inventory, order, and payment workflows.
+- Identify external credentials and services needed.
+- Produce a short implementation plan.
+
+### Phase 2: Project setup
+- Initialize the project.
+- Install dependencies.
+- Configure TypeScript and styling.
+- Configure environment variables.
+- Configure Supabase.
+- Create database migrations.
+- Implement authentication and access control.
+
+### Phase 3: Storefront
+- Build the shared layout.
+- Build navigation and mega menu.
+- Build the homepage.
+- Build categories and catalog.
+- Build search and filtering.
+- Build product detail pages.
+- Connect all pages to the database.
+
+### Phase 4: Cart and checkout
+- Implement persistent carts.
+- Implement pricing calculations.
+- Implement coupons.
+- Implement delivery rules.
+- Implement checkout validation.
+- Implement transactional order creation.
+- Implement COD and bank transfer.
+- Implement the online payment adapter and sandbox setup.
+
+### Phase 5: Customer portal
+- Implement profiles.
+- Implement address management.
+- Implement order history.
+- Implement order tracking.
+- Implement wishlists.
+- Implement invoices.
+- Implement eligible return requests.
+
+### Phase 6: Admin portal
+- Implement dashboard analytics.
+- Implement product management.
+- Implement category and brand management.
+- Implement inventory and stock movements.
+- Implement order management.
+- Implement customer management.
+- Implement coupons.
+- Implement store settings.
+- Implement audit logs.
+
+### Phase 7: Wholesale
+- Implement wholesale applications.
+- Implement approval workflows.
+- Implement wholesale pricing.
+- Implement bulk orders and quote requests.
+
+### Phase 8: Quality assurance
+- Run linting and type checking.
+- Run unit and integration tests.
+- Run end-to-end tests.
+- Check mobile responsiveness.
+- Test authentication and permissions.
+- Test inventory consistency.
+- Test checkout and payment failure cases.
+- Fix errors instead of merely documenting them.
+
+### Phase 9: Deployment
+- Prepare production environment variables.
+- Apply database migrations.
+- Configure storage policies.
+- Configure authentication URLs.
+- Configure the payment provider.
+- Configure email delivery.
+- Configure the production domain.
+- Verify deployment and security.
+- Provide a production readiness checklist.
+
+## 31. FINAL DELIVERABLES
+
+At the end, provide:
+
+1. Complete application source code.
+2. Working storefront.
+3. Working customer portal.
+4. Working admin portal.
+5. Database schema and migrations.
+6. Seed data.
+7. Authentication and authorization.
+8. Inventory management.
+9. Shopping cart and checkout.
+10. Payment integration or clearly documented setup mode.
+11. Order management.
+12. Invoice generation.
+13. Automated tests.
+14. .env.example.
+15. README.md with complete installation instructions.
+16. Local development instructions.
+17. Database setup instructions.
+18. Admin account creation instructions.
+19. Payment gateway configuration instructions.
+20. Email configuration instructions.
+21. Deployment instructions.
+22. Security checklist.
+23. Known limitations and remaining configuration requirements.
+
+Include the exact commands needed to install dependencies, start the development server, run tests, apply migrations, and deploy the project.
+
+Provide a clear list of implemented features versus features requiring external credentials or manual business configuration.
+
+## 32. ACCEPTANCE CRITERIA
+
+The project is not complete merely because the homepage looks attractive.
+
+Consider the application ready for business testing only when:
+
+- The website starts successfully.
+- Products are retrieved from the database.
+- The administrator can create, edit, and archive products.
+- Product images can be uploaded.
+- Stock changes are recorded correctly.
+- Customers can register and sign in.
+- Customers can search and filter products.
+- Customers can add products to the cart.
+- The cart calculates totals correctly.
+- Customers can submit a valid order.
+- Orders are stored persistently in the database.
+- The admin can view and manage orders.
+- Payment status is handled securely.
+- Stock cannot be oversold through concurrent checkouts.
+- Customers cannot access another customer's information.
+- Non-admin users cannot perform administrative actions.
+- Invoices can be generated.
+- Mobile and desktop layouts work.
+- Tests cover the critical business workflows.
+- Deployment instructions are complete.
+- Missing credentials and external integrations are clearly disclosed.
+
+Do not claim production readiness until these requirements have been verified.
+
+## 33. YOUR FIRST ACTION
+
+Start by inspecting the current working environment and determining whether a project already exists.
+
+If a project exists, inspect it and preserve its existing working functionality.
+
+If no project exists, initialize the application using the proposed stack.
+
+Then:
+1. Summarize the architecture.
+2. Create the implementation checklist.
+3. Identify the required environment variables.
+4. Design the database schema.
+5. Begin implementing the actual application.
+
+Work directly in the available project workspace whenever your environment supports file editing and command execution.
+
+Build and verify the application in manageable stages. Do not merely describe what code should be written; create the actual files and run the relevant commands and tests.
+  
+If the environment has limitations, state them honestly and provide the exact files or commands needed to continue.
+
+Your objective is to deliver a professional, secure, maintainable, fully functional e-commerce platform for a Pakistani tractor spare parts and lubricants business, with a premium storefront and a powerful administration system.
+
+Begin now.

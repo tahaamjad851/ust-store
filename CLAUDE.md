@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Umar Traders: an online store with retail and wholesale ordering. Next.js (App Router) frontend, Supabase for database, auth and storage.
+Umar Siddique Traders: an online store for tractor parts and lubricants. One retail price for everyone; bulk buyers send a quote request or use WhatsApp (no wholesale pricing, see docs/ROADMAP.md decisions). Next.js (App Router) frontend, Supabase for database, auth and storage.
 
 Project phases are defined in docs/ROADMAP.md
 
@@ -29,8 +29,8 @@ Stack: Next.js 16 (App Router, Turbopack), React 19, TypeScript 5.9 (TS 7 is blo
 ## Architecture
 
 - `src/app/` — routing only. Route groups: `(store)` for the public shop, `(auth)` for sign-in/up; plus `account/`, `admin/` and `api/`. Keep pages thin and call into `features/`.
-- `src/features/` — domain logic per area (catalog, inventory, orders, payments, customers, wholesale). Business rules live here, not in components or route handlers.
-- `src/lib/` — shared infrastructure clients and helpers (Supabase client, auth, validation schemas, pricing, payment providers, notifications, file storage). Retail vs. wholesale pricing belongs in `lib/pricing`, not in components.
+- `src/features/` — domain logic per area (catalog, inventory, orders, payments, customers, wholesale = bulk quote requests only). Business rules live here, not in components or route handlers.
+- `src/lib/` — shared infrastructure clients and helpers (Supabase client, auth, validation schemas, pricing, payment providers, notifications, file storage). Price and total calculations belong in `lib/pricing` (display) and the `place_order()` database function (authoritative), not in components.
 - `src/components/` — presentational UI grouped by area; `ui/` holds the generic primitives.
 - `src/services/`, `src/hooks/`, `src/types/` — data-access wrappers, React hooks, shared TypeScript types.
 - `supabase/migrations/` — every schema change goes in a new migration file; never edit an applied one.
