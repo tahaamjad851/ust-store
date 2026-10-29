@@ -8,15 +8,41 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 import { whatsappHref } from "@/lib/contact";
 import { USING_DEMO_DATA } from "@/lib/mock";
-import { getActiveProductIds, getCategoryTree, getStoreSettings } from "@/services/catalog";
+import { getActiveProductIds, getCategoryTree, getStoreSettings, getTractorModels } from "@/services/catalog";
 
 export default async function StoreLayout({ children }: LayoutProps<"/">) {
-  const [settings, tree, productIds] = await Promise.all([getStoreSettings(), getCategoryTree(), getActiveProductIds()]);
+  const [settings, tree, productIds, models] = await Promise.all([
+    getStoreSettings(),
+    getCategoryTree(),
+    getActiveProductIds(),
+    getTractorModels(),
+  ]);
 
+  // Categories with several subcategories get a desktop mega-menu (desktop homepage design).
   const navItems: NavItem[] = [
     { href: "/", label: "Home" },
     { href: "/shop", label: "Shop" },
-    ...tree.slice(0, 6).map((c) => ({ href: `/categories/${c.slug}`, label: c.name })),
+    ...tree.slice(0, 6).map((c) => ({
+      href: `/categories/${c.slug}`,
+      label: c.name,
+      menu:
+        c.children.length >= 6
+          ? {
+              title: `${c.name} catalogue`,
+              groups: c.children.map((s) => ({
+                href: `/categories/${c.slug}/${s.slug}`,
+                label: s.name,
+                description: s.description,
+                icon: s.icon,
+              })),
+              quickLinks: {
+                title: "Shop by model:",
+                links: models.map((m) => ({ href: `/shop?model=${m.id}`, label: m.model })),
+              },
+              allLink: { href: `/categories/${c.slug}`, label: `Shop all ${c.name.toLowerCase()}` },
+            }
+          : undefined,
+    })),
   ];
 
   const drawerCategories = tree.map(({ id, slug, name, icon, children }) => ({
