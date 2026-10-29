@@ -39,3 +39,6 @@ Thumbs.db
 
 # Personal Claude settings
 .claude/settings.local.json
+
+# Stitch design exports: contain client contact/bank details and remote hotlinks — local only
+design/stitch/
