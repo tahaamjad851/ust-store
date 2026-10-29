@@ -39,4 +39,10 @@ export const DEMO_CATEGORIES: Category[] = [
   sub("sub-oil-filters", "cat-filters", "oil-filters", "Oil Filters", "filter", 1, "Engine oil filters."),
   sub("sub-air-filters", "cat-filters", "air-filters", "Air Filters", "filter", 2, "Primary and secondary air filter elements."),
   sub("sub-fuel-filters", "cat-filters", "fuel-filters", "Fuel Filters", "filter", 3, "Diesel fuel filters and water separators."),
+
+  sub("sub-gear-oils", "cat-lubricants", "gear-oils", "Gear Oils", "lubricant", 1, "Gear and differential oils."),
+  sub("sub-grease", "cat-lubricants", "grease", "Grease", "lubricant", 2, "Multipurpose and high-temperature greases."),
+
+  sub("sub-tyres", "cat-tyres-radiators", "tyres", "Tyres", "tyre", 1, "Front and rear tractor tyres and tubes."),
+  sub("sub-radiators", "cat-tyres-radiators", "radiators", "Radiators", "cooling", 2, "Radiators and radiator caps."),
 ];

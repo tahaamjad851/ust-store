@@ -31,7 +31,9 @@ export default async function HomePage() {
   const partIds = new Set([tractorParts?.id, ...(tractorParts?.children.map((c) => c.id) ?? [])]);
   const featured = products.filter((p) => partIds.has(p.category_id)).slice(0, 5);
   const fluidCategoryIds = new Set(
-    tree.filter((c) => ["engine-oils", "lubricants", "hydraulic-oils"].includes(c.slug)).map((c) => c.id),
+    tree
+      .filter((c) => ["engine-oils", "lubricants", "hydraulic-oils"].includes(c.slug))
+      .flatMap((c) => [c.id, ...c.children.map((s) => s.id)]),
   );
   const fluids = products.filter((p) => fluidCategoryIds.has(p.category_id)).slice(0, 4);
   const wa = whatsappHref(settings.whatsapp_number);

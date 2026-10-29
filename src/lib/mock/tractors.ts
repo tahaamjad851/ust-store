@@ -33,4 +33,6 @@ export const DEMO_PRODUCT_FITMENTS: ProductFitment[] = [
   { product_id: "p-fuel-filter", tractor_model_id: "tm-nh-7056" },
   { product_id: "p-oil-filter", tractor_model_id: "tm-mf-385" },
   { product_id: "p-oil-filter", tractor_model_id: "tm-mf-240" },
+  { product_id: "p-air-filter", tractor_model_id: "tm-mf-385" },
+  { product_id: "p-radiator", tractor_model_id: "tm-mf-240" },
 ];

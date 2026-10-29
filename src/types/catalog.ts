@@ -68,7 +68,6 @@ export type Product = {
   origin: string | null;
   retail_price_paisa: number;
   compare_at_price_paisa: number | null;
-  wholesale_price_paisa: number | null;
   stock_qty: number;
   low_stock_threshold: number;
   specs: ProductSpec[];
