@@ -48,17 +48,28 @@ function writeStorage(lines: CartLine[]) {
 
 const clampQty = (n: number) => Math.min(MAX_LINE_QTY, Math.max(1, Math.trunc(n)));
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+export function CartProvider({
+  knownProductIds,
+  children,
+}: {
+  /** Products that can currently be sold; stored lines for anything else are dropped. */
+  knownProductIds: string[];
+  children: React.ReactNode;
+}) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {
     // Read once after mount so server and first client render match.
+    const known = new Set(knownProductIds);
+    const stored = readStorage();
+    const valid = stored.filter((l) => known.has(l.product_id));
+    if (valid.length !== stored.length) writeStorage(valid);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLines(readStorage());
+    setLines(valid);
     setHydrated(true);
-  }, []);
+  }, [knownProductIds]);
 
   const update = useCallback((next: (prev: CartLine[]) => CartLine[]) => {
     setLines((prev) => {

@@ -75,6 +75,36 @@ export async function getFitmentLabels(): Promise<Record<string, string>> {
   return labels;
 }
 
+export type CartCatalogItem = Pick<
+  Product,
+  | "id"
+  | "slug"
+  | "name"
+  | "sku"
+  | "retail_price_paisa"
+  | "compare_at_price_paisa"
+  | "wholesale_price_paisa"
+  | "stock_qty"
+  | "low_stock_threshold"
+  | "image_paths"
+>;
+
+/** Slim, server-priced product snapshot for the DEMO client cart. Replaced by a server cart later. */
+export async function getCartCatalog(): Promise<CartCatalogItem[]> {
+  return DEMO_PRODUCTS.filter((p) => p.is_active).map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    sku: p.sku,
+    retail_price_paisa: p.retail_price_paisa,
+    compare_at_price_paisa: p.compare_at_price_paisa,
+    wholesale_price_paisa: p.wholesale_price_paisa,
+    stock_qty: p.stock_qty,
+    low_stock_threshold: p.low_stock_threshold,
+    image_paths: p.image_paths.slice(0, 1),
+  }));
+}
+
 export async function getRelatedProducts(product: Product, limit = 4): Promise<Product[]> {
   return DEMO_PRODUCTS.filter((p) => p.is_active && p.id !== product.id && p.category_id === product.category_id).slice(0, limit);
 }

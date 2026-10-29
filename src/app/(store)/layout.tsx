@@ -8,10 +8,11 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 import { whatsappHref } from "@/lib/contact";
 import { USING_DEMO_DATA } from "@/lib/mock";
-import { getCategoryTree, getStoreSettings } from "@/services/catalog";
+import { getCategoryTree, getProducts, getStoreSettings } from "@/services/catalog";
 
 export default async function StoreLayout({ children }: LayoutProps<"/">) {
-  const [settings, tree] = await Promise.all([getStoreSettings(), getCategoryTree()]);
+  const [settings, tree, products] = await Promise.all([getStoreSettings(), getCategoryTree(), getProducts()]);
+  const productIds = products.map((p) => p.id);
 
   const navItems: NavItem[] = [
     { href: "/", label: "Home" },
@@ -28,7 +29,7 @@ export default async function StoreLayout({ children }: LayoutProps<"/">) {
   }));
 
   return (
-    <CartProvider>
+    <CartProvider knownProductIds={productIds}>
       <CategoryDrawerProvider
         categories={drawerCategories}
         whatsappHref={whatsappHref(settings.whatsapp_number)}
