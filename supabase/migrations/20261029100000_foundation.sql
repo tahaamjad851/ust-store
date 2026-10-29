@@ -3,7 +3,8 @@
 -- Security model (applies to every later migration):
 --   * RLS is enabled on every table; no policy = no access (default deny).
 --   * anon gets no table privileges by default; public catalog tables grant SELECT explicitly.
---   * New functions are not executable by public/anon/authenticated until granted explicitly.
+--   * New functions are not executable by public/anon/authenticated until granted explicitly
+--     (the hardening migration fails if anything outside an allowlist is executable).
 --   * Privileged writes (stock, order status, payments, roles) go through SECURITY DEFINER
 --     functions with `set search_path = ''`, an authorization check inside, and explicit grants.
 
@@ -14,6 +15,8 @@ alter default privileges for role postgres in schema public revoke all on tables
 alter default privileges for role postgres in schema public revoke truncate, references, trigger on tables from authenticated;
 alter default privileges for role postgres in schema public revoke all on sequences from anon;
 alter default privileges for role postgres in schema public revoke execute on functions from public, anon, authenticated;
+-- The built-in EXECUTE-to-PUBLIC default is global, so it must be revoked without IN SCHEMA.
+alter default privileges for role postgres revoke execute on functions from public;
 
 create extension if not exists pgcrypto with schema extensions;
 create extension if not exists pg_trgm with schema extensions;
@@ -83,7 +86,26 @@ $$;
 grant execute on function public.try_uuid(text) to anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
+-- Profiles: one per auth user, created by trigger (policies below).
+-- ---------------------------------------------------------------------------
+create table public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  full_name text check (full_name is null or length(full_name) between 1 and 120),
+  phone text check (phone is null or phone ~ '^03[0-9]{9}$'),
+  company_name text check (company_name is null or length(company_name) between 1 and 120),
+  disabled_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.profiles enable row level security;
+
+create trigger profiles_set_updated_at
+  before update on public.profiles
+  for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
 -- Roles. A user has at most one staff role; customers have no row.
+-- A disabled account (profiles.disabled_at) loses its role powers immediately.
 --   admin: everything, including roles, settings and bank accounts.
 --   staff: day-to-day operations (catalog, stock, orders) but not roles/settings/bank accounts.
 -- ---------------------------------------------------------------------------
@@ -106,6 +128,7 @@ as $$
   select exists (
     select 1 from public.user_roles r
     where r.user_id = (select auth.uid()) and r.role in ('admin', 'staff')
+      and not exists (select 1 from public.profiles p where p.id = r.user_id and p.disabled_at is not null)
   );
 $$;
 
@@ -120,6 +143,7 @@ as $$
   select exists (
     select 1 from public.user_roles r
     where r.user_id = (select auth.uid()) and r.role = 'admin'
+      and not exists (select 1 from public.profiles p where p.id = r.user_id and p.disabled_at is not null)
   );
 $$;
 
@@ -199,25 +223,10 @@ create trigger user_roles_audit
   for each row execute function public.audit_user_roles();
 
 -- ---------------------------------------------------------------------------
--- Profiles: one per auth user, created by trigger.
+-- Profile access (the table is created above, before the role helpers that read disabled_at).
 -- Customers may edit only full_name, phone and company_name (column privileges);
 -- disabled_at is admin-only (guard trigger).
 -- ---------------------------------------------------------------------------
-create table public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  full_name text check (full_name is null or length(full_name) between 1 and 120),
-  phone text check (phone is null or phone ~ '^03[0-9]{9}$'),
-  company_name text check (company_name is null or length(company_name) between 1 and 120),
-  disabled_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-alter table public.profiles enable row level security;
-
-create trigger profiles_set_updated_at
-  before update on public.profiles
-  for each row execute function public.set_updated_at();
-
 revoke insert, update, delete on public.profiles from authenticated;
 grant select on public.profiles to authenticated;
 grant update (full_name, phone, company_name, disabled_at) on public.profiles to authenticated;
@@ -225,10 +234,11 @@ grant update (full_name, phone, company_name, disabled_at) on public.profiles to
 create policy profiles_select on public.profiles
   for select to authenticated
   using (id = (select auth.uid()) or (select public.is_admin()));
+-- Staff may not edit customers' profiles; only the owner or a full admin.
 create policy profiles_update on public.profiles
   for update to authenticated
-  using (id = (select auth.uid()) or (select public.is_admin()))
-  with check (id = (select auth.uid()) or (select public.is_admin()));
+  using (id = (select auth.uid()) or (select public.is_full_admin()))
+  with check (id = (select auth.uid()) or (select public.is_full_admin()));
 
 create function public.guard_profile_update()
 returns trigger
@@ -238,7 +248,7 @@ set search_path = ''
 as $$
 begin
   if new.disabled_at is distinct from old.disabled_at then
-    if not public.is_full_admin() then
+    if not (public.is_full_admin() or coalesce((select auth.role()), '') = 'service_role') then
       raise exception 'only an admin can enable or disable accounts' using errcode = '42501';
     end if;
     perform public.log_audit(

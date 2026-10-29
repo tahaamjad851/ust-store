@@ -1,11 +1,12 @@
 -- Order functions. All money and stock decisions are made here, inside one transaction,
 -- from database values only. Callers never supply prices, discounts, shipping or totals.
 --
---   place_order()            signed-in customers (authenticated)
+--   place_order()            signed-in customers (authenticated; anonymous sign-ins rejected)
 --   place_order_as_guest()   guests, via the Next.js server only (service_role; anon cannot execute)
 --   set_order_status()       admin/staff; enforces the lifecycle and stock effects
 --   set_payment_status()     admin/staff; never automatic from customer input
 --   expire_unpaid_bank_transfers()  scheduled job (service_role / pg_cron)
+--   request_return()         customers, for delivered items
 --   get_order_by_tracking_token(), get_bank_transfer_details(), submit_bank_transfer_reference()
 --
 -- Order lifecycle (anything else is rejected):
@@ -20,6 +21,13 @@
 -- Stock: reserved by place_order(); released exactly once on cancellation; converted to a
 -- sale (on_hand and reserved both reduced) exactly once on shipped/delivered. Guarded by
 -- orders.stock_state and the unique (order_id, variant_id, movement_type) ledger index.
+--
+-- Lock order (prevents deadlocks): advisory locks (idempotency key, customer) -> inventory rows
+-- (sorted by variant id) -> product_variants/products (FOR SHARE) -> coupon -> order counter.
+-- Status changes lock the order row first, then its inventory rows (sorted).
+--
+-- Anti-hoarding: a customer (account or phone) may hold at most
+-- store_settings.max_open_orders_per_customer pending/confirmed orders.
 
 -- ---------------------------------------------------------------------------
 -- Internal helpers (not executable by any API role)
@@ -87,6 +95,17 @@ as $$
   );
 $$;
 
+create function public._account_disabled(p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_user_id is not null
+     and exists (select 1 from public.profiles where id = p_user_id and disabled_at is not null);
+$$;
+
 -- ---------------------------------------------------------------------------
 -- _place_order: shared implementation. p_user_id is NULL for guests.
 -- ---------------------------------------------------------------------------
@@ -120,6 +139,8 @@ declare
   v_province text;
   v_variant_ids uuid[];
   v_quantities integer[];
+  v_request_hash text;
+  v_open integer;
   v_line record;
   v_subtotal bigint := 0;
   v_eligible bigint := 0;
@@ -140,11 +161,14 @@ begin
   if p_idempotency_key is null then
     raise exception 'invalid_idempotency_key' using errcode = '22023';
   end if;
+  if p_payment_method is null then
+    raise exception 'payment_method_unavailable' using errcode = '22023';
+  end if;
 
   -- Serialise concurrent retries of the same request; the second waits and then replays.
   perform pg_advisory_xact_lock(hashtextextended('place_order:' || p_idempotency_key::text, 0));
 
-  -- Customer details --------------------------------------------------------
+  -- 1. Validate and normalise the request (no table locks yet). ---------------------------
   if jsonb_typeof(p_customer) is distinct from 'object' then
     raise exception 'invalid_customer' using errcode = '22023';
   end if;
@@ -152,33 +176,6 @@ begin
   if v_phone is null then
     raise exception 'invalid_phone' using errcode = '22023';
   end if;
-
-  select * into v_existing from public.orders where idempotency_key = p_idempotency_key;
-  if found then
-    if (p_user_id is not null and v_existing.user_id = p_user_id)
-       or (p_user_id is null and v_existing.user_id is null and v_existing.customer_phone = v_phone) then
-      -- The first response was lost, so issue a fresh tracking token (only its hash is stored).
-      v_token := public._new_token();
-      update public.orders set tracking_token_hash = public._hash_token(v_token) where id = v_existing.id;
-      return jsonb_build_object(
-        'order_id', v_existing.id,
-        'order_number', v_existing.order_number,
-        'total_paisa', v_existing.total_paisa,
-        'tracking_token', v_token,
-        'replayed', true
-      );
-    end if;
-    raise exception 'idempotency_key_conflict' using errcode = '23505';
-  end if;
-
-  select * into v_settings from public.store_settings where id;
-
-  if (p_payment_method = 'cod' and not v_settings.cod_enabled)
-     or (p_payment_method = 'bank_transfer' and not v_settings.bank_transfer_enabled)
-     or (p_payment_method = 'online' and not v_settings.online_payment_enabled) then
-    raise exception 'payment_method_unavailable' using errcode = '22023';
-  end if;
-
   v_name := trim(coalesce(p_customer ->> 'full_name', ''));
   if length(v_name) not between 2 and 80 then
     raise exception 'invalid_name' using errcode = '22023';
@@ -196,7 +193,6 @@ begin
     raise exception 'invalid_notes' using errcode = '22023';
   end if;
 
-  -- Address snapshot ---------------------------------------------------------
   if jsonb_typeof(p_shipping_address) is distinct from 'object' then
     raise exception 'invalid_address' using errcode = '22023';
   end if;
@@ -222,11 +218,20 @@ begin
     'instructions', nullif(trim(coalesce(p_shipping_address ->> 'instructions', '')), '')
   ));
 
-  -- Cart lines: variant ids and quantities only; duplicates are merged. -------------------
+  -- Cart lines: variant ids and quantities only; duplicates are merged.
   if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) not between 1 and 50 then
     raise exception 'invalid_items' using errcode = '22023';
   end if;
   begin
+    if exists (
+      select 1 from jsonb_array_elements(p_items) e
+       where jsonb_typeof(e) <> 'object'
+          or (e ->> 'variant_id') is null
+          or (e ->> 'quantity') is null
+          or (e ->> 'quantity')::integer not between 1 and 999
+    ) then
+      raise exception 'invalid_items' using errcode = '22023';
+    end if;
     select array_agg(variant_id order by variant_id), array_agg(qty order by variant_id)
       into v_variant_ids, v_quantities
       from (
@@ -234,10 +239,7 @@ begin
           from jsonb_array_elements(p_items) e
          group by 1
       ) s;
-    if exists (
-      select 1 from jsonb_array_elements(p_items) e
-       where (e ->> 'variant_id') is null or (e ->> 'quantity')::integer not between 1 and 999
-    ) or exists (select 1 from unnest(v_quantities) q where q > 999) then
+    if exists (select 1 from unnest(v_quantities) q where q > 999) then
       raise exception 'invalid_items' using errcode = '22023';
     end if;
   exception
@@ -245,12 +247,74 @@ begin
       raise exception 'invalid_items' using errcode = '22023';
   end;
 
-  -- Lock stock rows in a fixed order (prevents deadlocks between concurrent checkouts).
+  v_coupon_code := nullif(upper(trim(coalesce(p_coupon_code, ''))), '');
+
+  -- 2. Idempotency: same caller + same request => same order. ------------------------------
+  v_request_hash := public._hash_token(jsonb_build_object(
+    'items', (select jsonb_agg(jsonb_build_array(q.variant_id, q.qty) order by q.variant_id)
+                from unnest(v_variant_ids, v_quantities) as q (variant_id, qty)),
+    'customer', jsonb_build_object('name', v_name, 'phone', v_phone, 'email', v_email, 'company', v_company),
+    'address', v_address,
+    'delivery', p_delivery_method_id,
+    'payment', p_payment_method,
+    'coupon', v_coupon_code,
+    'notes', v_notes
+  )::text);
+
+  select * into v_existing from public.orders where idempotency_key = p_idempotency_key;
+  if found then
+    if ((p_user_id is not null and v_existing.user_id = p_user_id)
+        or (p_user_id is null and v_existing.user_id is null and v_existing.customer_phone = v_phone))
+       and v_existing.request_hash = v_request_hash then
+      -- The tracking token is only returned by the first call; the server keeps it for the session.
+      return jsonb_build_object(
+        'order_id', v_existing.id,
+        'order_number', v_existing.order_number,
+        'subtotal_paisa', v_existing.subtotal_paisa,
+        'discount_paisa', v_existing.discount_paisa,
+        'shipping_paisa', v_existing.shipping_paisa,
+        'total_paisa', v_existing.total_paisa,
+        'payment_method', v_existing.payment_method,
+        'reservation_expires_at', v_existing.reservation_expires_at,
+        'tracking_token', null,
+        'replayed', true
+      );
+    end if;
+    raise exception 'idempotency_key_conflict' using errcode = '23505';
+  end if;
+
+  -- 3. Settings, payment method, open-order cap. ------------------------------------------
+  select * into v_settings from public.store_settings where id;
+
+  if (p_payment_method = 'cod' and not v_settings.cod_enabled)
+     or (p_payment_method = 'bank_transfer' and not v_settings.bank_transfer_enabled)
+     or (p_payment_method = 'online' and not v_settings.online_payment_enabled) then
+    raise exception 'payment_method_unavailable' using errcode = '22023';
+  end if;
+
+  -- Serialise orders per customer so the cap cannot be raced.
+  perform pg_advisory_xact_lock(hashtextextended('open_orders:phone:' || v_phone, 0));
+  if p_user_id is not null then
+    perform pg_advisory_xact_lock(hashtextextended('open_orders:user:' || p_user_id::text, 0));
+  end if;
+  select count(*) into v_open
+    from public.orders o
+   where o.status in ('pending', 'confirmed')
+     and (o.customer_phone = v_phone or (p_user_id is not null and o.user_id = p_user_id));
+  if v_open >= v_settings.max_open_orders_per_customer then
+    raise exception 'too_many_open_orders' using errcode = 'P0001';
+  end if;
+
+  -- 4. Lock stock rows (sorted), then the price rows they depend on. ----------------------
   perform 1 from public.inventory where variant_id = any (v_variant_ids) order by variant_id for update;
+  perform 1 from public.product_variants where id = any (v_variant_ids) order by id for share;
+  perform 1 from public.products
+   where id in (select product_id from public.product_variants where id = any (v_variant_ids))
+   order by id for share;
 
   -- Validate availability and price every line from the database.
   for v_line in
-    select q.variant_id as requested_id, q.qty, v.id as variant_id, p.id as product_id, p.category_id,
+    select q.variant_id as requested_id, q.qty, v.id as variant_id, p.id as product_id,
            public.effective_price_paisa(v.regular_price_paisa, v.sale_price_paisa) as unit_price,
            coalesce(i.on_hand, 0) - coalesce(i.reserved, 0) as available, v.sku
       from unnest(v_variant_ids, v_quantities) as q (variant_id, qty)
@@ -269,67 +333,7 @@ begin
     v_subtotal := v_subtotal + v_line.unit_price * v_line.qty;
   end loop;
 
-  -- Coupon -------------------------------------------------------------------------------
-  v_coupon_code := nullif(upper(trim(coalesce(p_coupon_code, ''))), '');
-  if v_coupon_code is not null then
-    select * into v_coupon from public.coupons where code = v_coupon_code for update;
-    if not found or not v_coupon.is_active
-       or (v_coupon.starts_at is not null and v_coupon.starts_at > now())
-       or (v_coupon.ends_at is not null and v_coupon.ends_at <= now()) then
-      raise exception 'coupon_invalid' using errcode = 'P0001';
-    end if;
-    if v_subtotal < v_coupon.min_order_paisa then
-      raise exception 'coupon_min_order' using errcode = 'P0001', detail = v_coupon.min_order_paisa::text;
-    end if;
-    if v_coupon.usage_limit is not null then
-      select count(*) into v_used
-        from public.coupon_redemptions r join public.orders o on o.id = r.order_id
-       where r.coupon_id = v_coupon.id and o.status <> 'cancelled';
-      if v_used >= v_coupon.usage_limit then
-        raise exception 'coupon_exhausted' using errcode = 'P0001';
-      end if;
-    end if;
-    if v_coupon.per_customer_limit is not null then
-      select count(*) into v_used
-        from public.coupon_redemptions r join public.orders o on o.id = r.order_id
-       where r.coupon_id = v_coupon.id and o.status <> 'cancelled'
-         and ((p_user_id is not null and r.user_id = p_user_id) or r.customer_phone = v_phone);
-      if v_used >= v_coupon.per_customer_limit then
-        raise exception 'coupon_already_used' using errcode = 'P0001';
-      end if;
-    end if;
-
-    v_has_targets := exists (select 1 from public.coupon_products where coupon_id = v_coupon.id)
-                  or exists (select 1 from public.coupon_categories where coupon_id = v_coupon.id);
-    if v_has_targets then
-      select coalesce(sum(public.effective_price_paisa(v.regular_price_paisa, v.sale_price_paisa) * q.qty), 0)
-        into v_eligible
-        from unnest(v_variant_ids, v_quantities) as q (variant_id, qty)
-        join public.product_variants v on v.id = q.variant_id
-        join public.products p on p.id = v.product_id
-        left join public.categories c on c.id = p.category_id
-       where exists (select 1 from public.coupon_products cp where cp.coupon_id = v_coupon.id and cp.product_id = p.id)
-          or exists (select 1 from public.coupon_categories cc where cc.coupon_id = v_coupon.id
-                      and cc.category_id in (p.category_id, c.parent_id));
-    else
-      v_eligible := v_subtotal;
-    end if;
-
-    if v_coupon.discount_type = 'percent' then
-      v_discount := (v_eligible * v_coupon.percent_bps) / 10000;
-    else
-      v_discount := least(v_coupon.amount_paisa, v_eligible);
-    end if;
-    if v_coupon.max_discount_paisa is not null then
-      v_discount := least(v_discount, v_coupon.max_discount_paisa);
-    end if;
-    v_discount := least(v_discount, v_subtotal);
-    if v_discount <= 0 then
-      raise exception 'coupon_not_applicable' using errcode = 'P0001';
-    end if;
-  end if;
-
-  -- Shipping: most specific active rate for the method and address. ------------------------
+  -- 5. Delivery method and rate (validated before any coupon check). ----------------------
   select * into v_method from public.delivery_methods where id = p_delivery_method_id and is_active;
   if not found then
     raise exception 'delivery_method_unavailable' using errcode = 'P0001';
@@ -345,13 +349,79 @@ begin
   if not found then
     raise exception 'no_shipping_rate' using errcode = 'P0001';
   end if;
+
+  -- 6. Coupon. Every failure is the same generic error so codes cannot be probed. -----------
+  if v_coupon_code is not null then
+    select * into v_coupon from public.coupons where code = v_coupon_code for update;
+    if not found or not v_coupon.is_active
+       or (v_coupon.starts_at is not null and v_coupon.starts_at > now())
+       or (v_coupon.ends_at is not null and v_coupon.ends_at <= now())
+       or v_subtotal < v_coupon.min_order_paisa then
+      raise exception 'coupon_invalid' using errcode = 'P0001';
+    end if;
+    if v_coupon.usage_limit is not null then
+      select count(*) into v_used
+        from public.coupon_redemptions r join public.orders o on o.id = r.order_id
+       where r.coupon_id = v_coupon.id and o.status <> 'cancelled';
+      if v_used >= v_coupon.usage_limit then
+        raise exception 'coupon_invalid' using errcode = 'P0001';
+      end if;
+    end if;
+    if v_coupon.per_customer_limit is not null then
+      select count(*) into v_used
+        from public.coupon_redemptions r join public.orders o on o.id = r.order_id
+       where r.coupon_id = v_coupon.id and o.status <> 'cancelled'
+         and ((p_user_id is not null and r.user_id = p_user_id) or r.customer_phone = v_phone);
+      if v_used >= v_coupon.per_customer_limit then
+        raise exception 'coupon_invalid' using errcode = 'P0001';
+      end if;
+    end if;
+
+    v_has_targets := exists (select 1 from public.coupon_products where coupon_id = v_coupon.id)
+                  or exists (select 1 from public.coupon_categories where coupon_id = v_coupon.id);
+    if v_has_targets then
+      -- A product matches if it is targeted directly or any ancestor of its category is targeted.
+      select coalesce(sum(public.effective_price_paisa(v.regular_price_paisa, v.sale_price_paisa) * q.qty), 0)
+        into v_eligible
+        from unnest(v_variant_ids, v_quantities) as q (variant_id, qty)
+        join public.product_variants v on v.id = q.variant_id
+        join public.products p on p.id = v.product_id
+       where exists (select 1 from public.coupon_products cp where cp.coupon_id = v_coupon.id and cp.product_id = p.id)
+          or exists (
+               with recursive ancestors as (
+                 select c.id, c.parent_id from public.categories c where c.id = p.category_id
+                 union all
+                 select c.id, c.parent_id from public.categories c join ancestors a on c.id = a.parent_id
+               )
+               select 1 from ancestors a
+                 join public.coupon_categories cc on cc.category_id = a.id and cc.coupon_id = v_coupon.id
+             );
+    else
+      v_eligible := v_subtotal;
+    end if;
+
+    if v_coupon.discount_type = 'percent' then
+      v_discount := (v_eligible * v_coupon.percent_bps) / 10000;
+    else
+      v_discount := least(v_coupon.amount_paisa, v_eligible);
+    end if;
+    if v_coupon.max_discount_paisa is not null then
+      v_discount := least(v_discount, v_coupon.max_discount_paisa);
+    end if;
+    v_discount := least(v_discount, v_subtotal);
+    if v_discount <= 0 then
+      raise exception 'coupon_invalid' using errcode = 'P0001';
+    end if;
+  end if;
+
+  -- 7. Shipping fee (free when the discounted subtotal reaches the threshold). -------------
   v_free_over := coalesce(v_rate.free_over_paisa, v_settings.free_delivery_threshold_paisa);
   v_shipping := case
     when v_free_over is not null and v_subtotal - v_discount >= v_free_over then 0
     else v_rate.fee_paisa
   end;
 
-  -- Order number UST-<year>-<seq>, restarting each year (Asia/Karachi). ----------------------
+  -- 8. Order number UST-<year>-<seq>, restarting each year (Asia/Karachi). ----------------
   v_year := extract(year from (now() at time zone 'Asia/Karachi'))::integer;
   insert into public.order_number_counters as c (year, last_value)
   values (v_year, 1)
@@ -362,16 +432,17 @@ begin
 
   v_token := public._new_token();
 
+  -- 9. Write the order, lines, reservations, history, payment and coupon redemption. -------
   insert into public.orders (
-    order_number, user_id, idempotency_key, tracking_token_hash, status, payment_status, payment_method,
-    stock_state, customer_name, customer_phone, customer_email, company_name, shipping_address,
-    delivery_method_id, delivery_method_name, subtotal_paisa, discount_paisa, shipping_paisa, total_paisa,
-    coupon_id, coupon_code, customer_notes, reservation_expires_at
+    order_number, user_id, idempotency_key, request_hash, tracking_token_hash, status, payment_status,
+    payment_method, stock_state, customer_name, customer_phone, customer_email, company_name,
+    shipping_address, delivery_method_id, delivery_method_name, subtotal_paisa, discount_paisa,
+    shipping_paisa, total_paisa, coupon_id, coupon_code, customer_notes, reservation_expires_at
   ) values (
-    v_order_number, p_user_id, p_idempotency_key, public._hash_token(v_token), 'pending', 'unpaid', p_payment_method,
-    'reserved', v_name, v_phone, v_email, v_company, v_address,
-    v_method.id, v_method.name, v_subtotal, v_discount, v_shipping, v_subtotal - v_discount + v_shipping,
-    v_coupon.id, v_coupon.code, v_notes,
+    v_order_number, p_user_id, p_idempotency_key, v_request_hash, public._hash_token(v_token), 'pending', 'unpaid',
+    p_payment_method, 'reserved', v_name, v_phone, v_email, v_company,
+    v_address, v_method.id, v_method.name, v_subtotal, v_discount,
+    v_shipping, v_subtotal - v_discount + v_shipping, v_coupon.id, v_coupon.code, v_notes,
     case when p_payment_method = 'bank_transfer'
          then now() + make_interval(hours => v_settings.bank_transfer_hold_hours) end
   )
@@ -386,7 +457,6 @@ begin
     join public.product_variants v on v.id = q.variant_id
     join public.products p on p.id = v.product_id;
 
-  -- Reserve stock and write one ledger row per variant.
   with reserved as (
     update public.inventory i
        set reserved = i.reserved + q.qty
@@ -447,7 +517,11 @@ begin
   if v_uid is null then
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
-  if exists (select 1 from public.profiles where id = v_uid and disabled_at is not null) then
+  -- Supabase anonymous sign-ins get an authenticated JWT; they must check out as guests.
+  if coalesce(((select auth.jwt()) ->> 'is_anonymous')::boolean, false) then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+  if public._account_disabled(v_uid) then
     raise exception 'account_disabled' using errcode = '42501';
   end if;
   return public._place_order(v_uid, p_idempotency_key, p_items, p_customer, p_shipping_address,
@@ -481,7 +555,7 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Stock effects of status changes (internal)
+-- Stock effects of status changes (internal; callers hold the order row lock)
 -- ---------------------------------------------------------------------------
 create function public._release_order_stock(p_order_id uuid, p_actor uuid)
 returns void
@@ -588,11 +662,12 @@ begin
    where id = v_order.id
   returning * into v_order;
 
+  -- Notes are shown to the customer on their order; internal remarks belong in internal_notes.
   insert into public.order_status_history (order_id, from_status, to_status, note, actor_id)
   values (v_order.id, v_from, p_to, left(p_note, 500), p_actor);
 
   perform public.log_audit('order.status', 'orders', v_order.id::text,
-    jsonb_build_object('to', p_to, 'note', left(p_note, 500)));
+    jsonb_build_object('from', v_from, 'to', p_to, 'note', left(p_note, 500)));
   return v_order;
 end;
 $$;
@@ -628,6 +703,7 @@ as $$
 declare
   v_order public.orders;
   v_uid uuid := (select auth.uid());
+  v_hold integer;
 begin
   if not public.is_admin() then
     raise exception 'not_authorized' using errcode = '42501';
@@ -643,11 +719,19 @@ begin
   if v_order.status = 'cancelled' and p_status <> 'refunded' then
     raise exception 'order_cancelled' using errcode = 'P0001';
   end if;
+  select bank_transfer_hold_hours into v_hold from public.store_settings where id;
 
   update public.orders
      set payment_status = p_status,
          paid_at = case when p_status = 'paid' then now() else paid_at end,
-         reservation_expires_at = case when p_status = 'paid' then null else reservation_expires_at end
+         reservation_expires_at = case
+           when p_status = 'paid' then null
+           -- Rejected or reset bank transfers get a fresh hold so the customer can retry,
+           -- but the order still expires if nothing arrives.
+           when payment_method = 'bank_transfer' and p_status in ('unpaid', 'failed')
+             then greatest(coalesce(reservation_expires_at, now()), now() + make_interval(hours => v_hold))
+           else reservation_expires_at
+         end
    where id = v_order.id
   returning * into v_order;
 
@@ -664,8 +748,9 @@ begin
 end;
 $$;
 
--- Scheduled job: cancel unpaid bank-transfer orders whose hold period has passed.
+-- Scheduled job: cancel bank-transfer orders that are still unpaid (or rejected) after their hold.
 -- Orders where the customer has submitted a reference (pending_verification) are left for staff.
+-- The batch's stock rows are locked up front in one global order, so it cannot deadlock with checkout.
 create function public.expire_unpaid_bank_transfers()
 returns integer
 language plpgsql
@@ -673,28 +758,34 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_ids uuid[];
   v_id uuid;
-  v_count integer := 0;
 begin
-  for v_id in
-    select id from public.orders
-     where payment_method = 'bank_transfer'
-       and payment_status = 'unpaid'
-       and status = 'pending'
-       and reservation_expires_at < now()
-     order by reservation_expires_at
-     limit 500
-     for update skip locked
-  loop
+  select coalesce(array_agg(id), '{}') into v_ids
+    from (
+      select id from public.orders
+       where payment_method = 'bank_transfer'
+         and payment_status in ('unpaid', 'failed')
+         and status in ('pending', 'confirmed')
+         and reservation_expires_at < now()
+       order by reservation_expires_at
+       limit 100
+       for update skip locked
+    ) s;
+
+  perform 1 from public.inventory
+   where variant_id in (select oi.variant_id from public.order_items oi where oi.order_id = any (v_ids))
+   order by variant_id for update;
+
+  foreach v_id in array v_ids loop
     perform public._transition_order(v_id, 'cancelled', 'Bank transfer not received within the hold period', null);
-    v_count := v_count + 1;
   end loop;
-  return v_count;
+  return cardinality(v_ids);
 end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Customer and guest lookups
+-- Customer and guest functions
 -- ---------------------------------------------------------------------------
 -- Resolves an order the caller may see: by tracking token, or by id for its signed-in owner.
 create function public._resolve_customer_order(p_order_id uuid, p_token text)
@@ -778,7 +869,7 @@ begin
   v_order := public._resolve_customer_order(p_order_id, p_token);
   if v_order.id is null
      or v_order.payment_method <> 'bank_transfer'
-     or v_order.status = 'cancelled'
+     or v_order.status not in ('pending', 'confirmed')
      or v_order.payment_status not in ('unpaid', 'pending_verification', 'failed') then
     return null;
   end if;
@@ -814,10 +905,15 @@ declare
   v_uid uuid := (select auth.uid());
   v_prefix text;
 begin
+  if public._account_disabled(v_uid) then
+    raise exception 'account_disabled' using errcode = '42501';
+  end if;
   v_order := public._resolve_customer_order(p_order_id, p_token);
   if v_order.id is null then
     raise exception 'order_not_found' using errcode = 'P0002';
   end if;
+  -- Lock, then validate the current state (a concurrent payment update or cancellation wins).
+  select * into v_order from public.orders where id = v_order.id for update;
   if v_order.payment_method <> 'bank_transfer' or v_order.status not in ('pending', 'confirmed')
      or v_order.payment_status not in ('unpaid', 'failed') then
     raise exception 'payment_not_awaited' using errcode = 'P0001';
@@ -844,6 +940,68 @@ begin
 end;
 $$;
 
+-- Customers request a return for an item of their own delivered order. Checks returnability,
+-- the store's return period (from the delivery time) and the quantity not already requested.
+create function public.request_return(p_order_item_id uuid, p_quantity integer, p_reason text)
+returns public.returns
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_item public.order_items;
+  v_order public.orders;
+  v_delivered_at timestamptz;
+  v_period integer;
+  v_already integer;
+  v_return public.returns;
+begin
+  if v_uid is null or public._account_disabled(v_uid) then
+    raise exception 'not_authorized' using errcode = '42501';
+  end if;
+  if p_quantity is null or p_quantity not between 1 and 999 then
+    raise exception 'invalid_quantity' using errcode = '22023';
+  end if;
+  if p_reason is null or length(trim(p_reason)) not between 3 and 1000 then
+    raise exception 'invalid_reason' using errcode = '22023';
+  end if;
+
+  select * into v_item from public.order_items where id = p_order_item_id for update;
+  if not found then
+    raise exception 'order_not_found' using errcode = 'P0002';
+  end if;
+  select * into v_order from public.orders where id = v_item.order_id;
+  if v_order.user_id is distinct from v_uid then
+    raise exception 'order_not_found' using errcode = 'P0002';
+  end if;
+  if v_order.status <> 'delivered' then
+    raise exception 'not_returnable' using errcode = 'P0001', detail = 'order not delivered';
+  end if;
+  if not coalesce((select p.is_returnable from public.products p where p.id = v_item.product_id), false) then
+    raise exception 'not_returnable' using errcode = 'P0001', detail = 'product not returnable';
+  end if;
+
+  select return_period_days into v_period from public.store_settings where id;
+  select max(created_at) into v_delivered_at
+    from public.order_status_history where order_id = v_order.id and to_status = 'delivered';
+  if v_period is not null and v_delivered_at + make_interval(days => v_period) < now() then
+    raise exception 'not_returnable' using errcode = 'P0001', detail = 'return period ended';
+  end if;
+
+  select coalesce(sum(quantity), 0) into v_already
+    from public.returns where order_item_id = v_item.id and status <> 'rejected';
+  if v_already + p_quantity > v_item.quantity then
+    raise exception 'invalid_quantity' using errcode = '22023', detail = 'exceeds quantity bought';
+  end if;
+
+  insert into public.returns (order_id, order_item_id, user_id, quantity, reason)
+  values (v_order.id, v_item.id, v_uid, p_quantity, trim(p_reason))
+  returning * into v_return;
+  return v_return;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Grants
 -- ---------------------------------------------------------------------------
@@ -852,6 +1010,7 @@ revoke all on function public._new_token() from public, anon, authenticated, ser
 revoke all on function public._normalize_pk_phone(text) from public, anon, authenticated, service_role;
 revoke all on function public._order_transition_allowed(public.order_status, public.order_status) from public, anon, authenticated, service_role;
 revoke all on function public._payment_transition_allowed(public.payment_status, public.payment_status) from public, anon, authenticated, service_role;
+revoke all on function public._account_disabled(uuid) from public, anon, authenticated, service_role;
 revoke all on function public._place_order(uuid, uuid, jsonb, jsonb, jsonb, text, public.payment_method, text, text) from public, anon, authenticated, service_role;
 revoke all on function public._release_order_stock(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public._deduct_order_stock(uuid, uuid) from public, anon, authenticated, service_role;
@@ -871,6 +1030,9 @@ grant execute on function public.set_payment_status(uuid, public.payment_status,
 
 revoke all on function public.expire_unpaid_bank_transfers() from public, anon, authenticated;
 grant execute on function public.expire_unpaid_bank_transfers() to service_role;
+
+revoke all on function public.request_return(uuid, integer, text) from public, anon;
+grant execute on function public.request_return(uuid, integer, text) to authenticated;
 
 revoke all on function public.get_order_by_tracking_token(text) from public, anon;
 grant execute on function public.get_order_by_tracking_token(text) to authenticated, service_role;

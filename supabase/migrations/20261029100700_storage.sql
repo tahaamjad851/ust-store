@@ -34,20 +34,21 @@ create policy product_images_admin_delete on storage.objects for delete to authe
 create policy payment_proofs_owner_insert on storage.objects for insert to authenticated
   with check (
     bucket_id = 'payment-proofs'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-    and array_length(storage.foldername(name), 1) = 2
+    and (storage.foldername(objects.name))[1] = (select auth.uid())::text
+    and array_length(storage.foldername(objects.name), 1) = 2
     and exists (
       select 1 from public.orders o
-       where o.id = public.try_uuid((storage.foldername(name))[2])
+       where o.id = public.try_uuid((storage.foldername(objects.name))[2])
          and o.user_id = (select auth.uid())
          and o.payment_method = 'bank_transfer'
          and o.status in ('pending', 'confirmed')
+         and o.payment_status in ('unpaid', 'failed')
     )
   );
 create policy payment_proofs_owner_select on storage.objects for select to authenticated
   using (
     bucket_id = 'payment-proofs'
-    and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_admin()))
+    and ((storage.foldername(objects.name))[1] = (select auth.uid())::text or (select public.is_admin()))
   );
 create policy payment_proofs_admin_delete on storage.objects for delete to authenticated
   using (bucket_id = 'payment-proofs' and (select public.is_full_admin()));

@@ -82,11 +82,11 @@ create policy carts_delete on public.carts for delete to authenticated
   using (user_id = (select auth.uid()));
 
 create policy cart_items_select on public.cart_items for select to authenticated
-  using (exists (select 1 from public.carts c where c.id = cart_id and c.user_id = (select auth.uid())));
+  using (exists (select 1 from public.carts c where c.id = cart_items.cart_id and c.user_id = (select auth.uid())));
 create policy cart_items_insert on public.cart_items for insert to authenticated
-  with check (exists (select 1 from public.carts c where c.id = cart_id and c.user_id = (select auth.uid())));
+  with check (exists (select 1 from public.carts c where c.id = cart_items.cart_id and c.user_id = (select auth.uid())));
 create policy cart_items_update on public.cart_items for update to authenticated
-  using (exists (select 1 from public.carts c where c.id = cart_id and c.user_id = (select auth.uid())))
-  with check (exists (select 1 from public.carts c where c.id = cart_id and c.user_id = (select auth.uid())));
+  using (exists (select 1 from public.carts c where c.id = cart_items.cart_id and c.user_id = (select auth.uid())))
+  with check (exists (select 1 from public.carts c where c.id = cart_items.cart_id and c.user_id = (select auth.uid())));
 create policy cart_items_delete on public.cart_items for delete to authenticated
-  using (exists (select 1 from public.carts c where c.id = cart_id and c.user_id = (select auth.uid())));
+  using (exists (select 1 from public.carts c where c.id = cart_items.cart_id and c.user_id = (select auth.uid())));

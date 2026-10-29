@@ -269,17 +269,17 @@ create policy products_select on public.products for select to anon, authenticat
 create policy product_variants_select on public.product_variants for select to anon, authenticated
   using (
     (select public.is_admin())
-    or (is_active and exists (select 1 from public.products p where p.id = product_id and p.status = 'published'))
+    or (is_active and exists (select 1 from public.products p where p.id = product_variants.product_id and p.status = 'published'))
   );
 create policy product_images_select on public.product_images for select to anon, authenticated
   using (
     (select public.is_admin())
-    or exists (select 1 from public.products p where p.id = product_id and p.status = 'published')
+    or exists (select 1 from public.products p where p.id = product_images.product_id and p.status = 'published')
   );
 create policy product_compatibility_select on public.product_compatibility for select to anon, authenticated
   using (
     (select public.is_admin())
-    or exists (select 1 from public.products p where p.id = product_id and p.status = 'published')
+    or exists (select 1 from public.products p where p.id = product_compatibility.product_id and p.status = 'published')
   );
 create policy product_variant_costs_select on public.product_variant_costs for select to authenticated
   using ((select public.is_admin()));

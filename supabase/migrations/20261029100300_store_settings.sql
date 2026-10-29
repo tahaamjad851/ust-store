@@ -28,6 +28,8 @@ create table public.store_settings (
   bank_transfer_enabled boolean not null default true,
   online_payment_enabled boolean not null default false,
   bank_transfer_hold_hours integer not null default 48 check (bank_transfer_hold_hours between 1 and 720),
+  -- Anti-hoarding: a customer (account or phone) may have at most this many pending/confirmed orders.
+  max_open_orders_per_customer integer not null default 3 check (max_open_orders_per_customer between 1 and 50),
   updated_at timestamptz not null default now()
 );
 alter table public.store_settings enable row level security;
@@ -174,14 +176,13 @@ create table public.coupon_categories (
 create index coupon_categories_category_idx on public.coupon_categories (category_id);
 alter table public.coupon_categories enable row level security;
 
--- Write policies: delivery methods and shipping rates for admin/staff; bank accounts and coupons admin only.
+-- Write policies: admin only (delivery fees, bank accounts and coupons are money settings, not staff work).
 do $$
 declare
   t text;
-  fn text;
+  fn text := 'is_full_admin';
 begin
   foreach t in array array['delivery_methods', 'shipping_rates', 'bank_accounts', 'coupons', 'coupon_products', 'coupon_categories'] loop
-    fn := case when t in ('delivery_methods', 'shipping_rates') then 'is_admin' else 'is_full_admin' end;
     if t in ('bank_accounts', 'coupons', 'coupon_products', 'coupon_categories') then
       execute format('create policy %I on public.%I for select to authenticated using ((select public.%I()))', t || '_select', t, fn);
     end if;

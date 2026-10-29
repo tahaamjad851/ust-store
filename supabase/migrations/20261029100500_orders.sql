@@ -20,7 +20,9 @@ create table public.orders (
   user_id uuid references auth.users (id) on delete set null,
   -- Same key returns the same order (double clicks, retries). Unique per order, scoped to the caller in place_order().
   idempotency_key uuid not null unique,
-  -- SHA-256 (hex) of the guest tracking token. The raw token is returned once and never stored.
+  -- SHA-256 of the normalised request; replaying a key with a different request is rejected.
+  request_hash text not null check (request_hash ~ '^[0-9a-f]{64}$'),
+  -- SHA-256 (hex) of the tracking token. The raw token is returned once, by the first call only.
   tracking_token_hash text not null unique check (tracking_token_hash ~ '^[0-9a-f]{64}$'),
   status public.order_status not null default 'pending',
   payment_status public.payment_status not null default 'unpaid',
@@ -43,7 +45,7 @@ create table public.orders (
   coupon_id uuid references public.coupons (id) on delete set null,
   coupon_code text check (coupon_code is null or length(coupon_code) <= 32),
   customer_notes text check (customer_notes is null or length(customer_notes) <= 1000),
-  -- Unpaid bank-transfer orders are cancelled after this time (expire_unpaid_bank_transfers()).
+  -- Bank-transfer orders not paid by this time are cancelled (expire_unpaid_bank_transfers()).
   reservation_expires_at timestamptz,
   paid_at timestamptz,
   cancelled_at timestamptz,
@@ -59,7 +61,11 @@ create index orders_payment_idx on public.orders (payment_method, payment_status
 create index orders_created_at_idx on public.orders (created_at desc);
 create index orders_phone_idx on public.orders (customer_phone);
 create index orders_expiry_idx on public.orders (reservation_expires_at)
-  where payment_method = 'bank_transfer' and payment_status = 'unpaid' and status = 'pending';
+  where payment_method = 'bank_transfer' and payment_status in ('unpaid', 'failed') and status in ('pending', 'confirmed');
+create index orders_open_user_idx on public.orders (user_id) where status in ('pending', 'confirmed');
+create index orders_open_phone_idx on public.orders (customer_phone) where status in ('pending', 'confirmed');
+create index orders_coupon_idx on public.orders (coupon_id) where coupon_id is not null;
+create index orders_delivery_method_idx on public.orders (delivery_method_id);
 alter table public.orders enable row level security;
 create trigger orders_set_updated_at before update on public.orders
   for each row execute function public.set_updated_at();
@@ -119,6 +125,7 @@ create table public.payments (
 );
 create index payments_order_idx on public.payments (order_id);
 create index payments_status_idx on public.payments (status);
+create index payments_verified_by_idx on public.payments (verified_by);
 alter table public.payments enable row level security;
 create trigger payments_set_updated_at before update on public.payments
   for each row execute function public.set_updated_at();
@@ -137,6 +144,7 @@ create table public.payment_events (
   constraint payment_events_provider_event_key unique (provider, provider_event_id)
 );
 create index payment_events_order_idx on public.payment_events (order_id);
+create index payment_events_payment_idx on public.payment_events (payment_id);
 alter table public.payment_events enable row level security;
 
 create table public.shipments (
@@ -154,6 +162,7 @@ create table public.shipments (
 );
 create index shipments_order_idx on public.shipments (order_id);
 create index shipments_tracking_idx on public.shipments (tracking_number);
+create index shipments_created_by_idx on public.shipments (created_by);
 alter table public.shipments enable row level security;
 create trigger shipments_set_updated_at before update on public.shipments
   for each row execute function public.set_updated_at();
@@ -172,6 +181,8 @@ create table public.returns (
 );
 create index returns_order_idx on public.returns (order_id);
 create index returns_status_idx on public.returns (status);
+create index returns_user_idx on public.returns (user_id, created_at desc);
+create index returns_order_item_idx on public.returns (order_item_id);
 alter table public.returns enable row level security;
 create trigger returns_set_updated_at before update on public.returns
   for each row execute function public.set_updated_at();
@@ -190,6 +201,8 @@ create table public.refunds (
   updated_at timestamptz not null default now()
 );
 create index refunds_order_idx on public.refunds (order_id);
+create index refunds_return_idx on public.refunds (return_id);
+create index refunds_created_by_idx on public.refunds (created_by);
 alter table public.refunds enable row level security;
 create trigger refunds_set_updated_at before update on public.refunds
   for each row execute function public.set_updated_at();
@@ -204,7 +217,11 @@ create table public.invoices (
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now()
 );
+create index invoices_created_by_idx on public.invoices (created_by);
 alter table public.invoices enable row level security;
+-- Issued invoices never change.
+create trigger invoices_immutable before update or delete on public.invoices
+  for each row execute function public.prevent_mutation();
 
 create table public.coupon_redemptions (
   id uuid primary key default gen_random_uuid(),
@@ -217,6 +234,7 @@ create table public.coupon_redemptions (
 );
 create index coupon_redemptions_coupon_idx on public.coupon_redemptions (coupon_id);
 create index coupon_redemptions_user_idx on public.coupon_redemptions (coupon_id, user_id);
+create index coupon_redemptions_user_only_idx on public.coupon_redemptions (user_id);
 create index coupon_redemptions_phone_idx on public.coupon_redemptions (coupon_id, customer_phone);
 alter table public.coupon_redemptions enable row level security;
 
@@ -235,6 +253,7 @@ create table public.reviews (
   constraint reviews_one_per_product unique (user_id, product_id)
 );
 create index reviews_product_idx on public.reviews (product_id, status);
+create index reviews_order_item_idx on public.reviews (order_item_id);
 alter table public.reviews enable row level security;
 create trigger reviews_set_updated_at before update on public.reviews
   for each row execute function public.set_updated_at();
@@ -278,6 +297,7 @@ create table public.notifications (
   updated_at timestamptz not null default now()
 );
 create index notifications_pending_idx on public.notifications (created_at) where status = 'pending';
+create index notifications_order_idx on public.notifications (order_id);
 alter table public.notifications enable row level security;
 create trigger notifications_set_updated_at before update on public.notifications
   for each row execute function public.set_updated_at();
@@ -292,6 +312,7 @@ create table public.internal_notes (
   created_at timestamptz not null default now()
 );
 create index internal_notes_entity_idx on public.internal_notes (entity_type, entity_id, created_at desc);
+create index internal_notes_author_idx on public.internal_notes (author_id);
 alter table public.internal_notes enable row level security;
 
 -- ---------------------------------------------------------------------------
@@ -310,23 +331,21 @@ begin
       create policy %I on public.%I for select to authenticated
       using (
         (select public.is_admin())
-        or exists (select 1 from public.orders o where o.id = order_id and o.user_id = (select auth.uid()))
-      )$f$, t || '_select', t);
+        or exists (select 1 from public.orders o where o.id = %I.order_id and o.user_id = (select auth.uid()))
+      )$f$, t || '_select', t, t);
   end loop;
 end;
 $$;
 
--- Staff record shipments, refunds and invoices directly.
-do $$
-declare
-  t text;
-begin
-  foreach t in array array['shipments', 'refunds', 'invoices'] loop
-    execute format('create policy %I on public.%I for insert to authenticated with check ((select public.is_admin()))', t || '_insert', t);
-    execute format('create policy %I on public.%I for update to authenticated using ((select public.is_admin())) with check ((select public.is_admin()))', t || '_update', t);
-  end loop;
-end;
-$$;
+-- Staff record shipments and issue invoices (invoices are immutable once issued).
+-- Refunds move money, so they are admin only.
+create policy shipments_insert on public.shipments for insert to authenticated with check ((select public.is_admin()));
+create policy shipments_update on public.shipments for update to authenticated
+  using ((select public.is_admin())) with check ((select public.is_admin()));
+create policy invoices_insert on public.invoices for insert to authenticated with check ((select public.is_admin()));
+create policy refunds_insert on public.refunds for insert to authenticated with check ((select public.is_full_admin()));
+create policy refunds_update on public.refunds for update to authenticated
+  using ((select public.is_full_admin())) with check ((select public.is_full_admin()));
 
 create policy payment_events_select on public.payment_events for select to authenticated
   using ((select public.is_admin()));
@@ -335,30 +354,15 @@ create policy coupon_redemptions_select on public.coupon_redemptions for select 
 create policy notifications_select on public.notifications for select to authenticated
   using ((select public.is_admin()));
 
--- Returns: customers request returns for items of their own delivered orders.
+-- Returns: customers create them only through request_return() (see order functions), which
+-- checks ownership, delivery, returnability, the return window and the running quantity.
 create policy returns_select on public.returns for select to authenticated
   using (user_id = (select auth.uid()) or (select public.is_admin()));
-create policy returns_insert on public.returns for insert to authenticated
-  with check (
-    user_id = (select auth.uid())
-    and status = 'requested'
-    and resolution_note is null
-    and exists (
-      select 1
-        from public.order_items oi
-        join public.orders o on o.id = oi.order_id
-       where oi.id = returns.order_item_id
-         and o.id = returns.order_id
-         and o.user_id = (select auth.uid())
-         and o.status = 'delivered'
-         and returns.quantity <= oi.quantity
-    )
-  );
 create policy returns_update on public.returns for update to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- Reviews: public sees approved ones; authors see their own; only verified purchasers can write.
-grant select on public.reviews to anon;
+grant select (id, product_id, rating, title, body, status, created_at) on public.reviews to anon;
 create policy reviews_select on public.reviews for select to anon, authenticated
   using (status = 'approved' or user_id = (select auth.uid()) or (select public.is_admin()));
 create policy reviews_insert on public.reviews for insert to authenticated
