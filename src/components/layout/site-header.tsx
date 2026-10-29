@@ -5,8 +5,7 @@ import { CartLink } from "@/components/cart/cart-link";
 import type { StoreSettings } from "@/types/store";
 import { CategoryDrawerTrigger } from "./category-drawer";
 
-const iconLink =
-  "inline-flex size-11 items-center justify-center gap-2 rounded-lg hover:bg-surface-low lg:w-auto lg:px-3";
+const iconLink = "size-11 items-center justify-center gap-2 rounded-lg hover:bg-surface-low lg:w-auto lg:px-3";
 
 export function SiteHeader({ settings }: { settings: StoreSettings }) {
   return (
@@ -24,7 +23,9 @@ export function SiteHeader({ settings }: { settings: StoreSettings }) {
             <Tractor className="size-6" aria-hidden="true" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-display text-headline-sm text-brand-deep">{settings.business_name}</span>
+            <span className="block font-display text-label-lg leading-tight text-brand-deep sm:text-headline-sm">
+              {settings.business_name}
+            </span>
             <span className="hidden truncate text-label-sm uppercase text-muted-foreground sm:block">
               {settings.tagline}
             </span>
@@ -62,7 +63,7 @@ export function SiteHeader({ settings }: { settings: StoreSettings }) {
               Account
             </span>
           </Link>
-          <Link href="/wishlist" className={iconLink} aria-label="Wishlist">
+          <Link href="/wishlist" className={`${iconLink} inline-flex`} aria-label="Wishlist">
             <Heart className="size-5" aria-hidden="true" />
             <span className="hidden text-label-lg lg:inline" aria-hidden="true">
               Wishlist
