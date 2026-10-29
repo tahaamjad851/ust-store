@@ -83,13 +83,12 @@ export type CartCatalogItem = Pick<
   | "sku"
   | "retail_price_paisa"
   | "compare_at_price_paisa"
-  | "wholesale_price_paisa"
   | "stock_qty"
   | "low_stock_threshold"
   | "image_paths"
 >;
 
-/** Slim, server-priced product snapshot for the DEMO client cart. Replaced by a server cart later. */
+/** Slim retail-priced snapshot for the DEMO client cart. Never add wholesale prices here: this is sent to every browser. */
 export async function getCartCatalog(): Promise<CartCatalogItem[]> {
   return DEMO_PRODUCTS.filter((p) => p.is_active).map((p) => ({
     id: p.id,
@@ -98,7 +97,6 @@ export async function getCartCatalog(): Promise<CartCatalogItem[]> {
     sku: p.sku,
     retail_price_paisa: p.retail_price_paisa,
     compare_at_price_paisa: p.compare_at_price_paisa,
-    wholesale_price_paisa: p.wholesale_price_paisa,
     stock_qty: p.stock_qty,
     low_stock_threshold: p.low_stock_threshold,
     image_paths: p.image_paths.slice(0, 1),

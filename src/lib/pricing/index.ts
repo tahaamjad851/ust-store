@@ -3,6 +3,9 @@ import type { Product } from "@/types/catalog";
 
 export type CustomerType = "retail" | "wholesale";
 
+/** Wholesale price is optional so browser-bound snapshots can omit it entirely. */
+export type PriceFields = Pick<Product, "retail_price_paisa"> & Partial<Pick<Product, "wholesale_price_paisa">>;
+
 /** Formats integer paisa as "Rs 16,500". Grouping is done by hand so server and browser output match. */
 export function formatPKR(paisa: number): string {
   const rupees = Math.round(paisa / 100);
@@ -14,8 +17,8 @@ export function formatPKR(paisa: number): string {
 }
 
 /** Unit price for a customer. Wholesale falls back to retail when no wholesale price is set. */
-export function unitPrice(product: Pick<Product, "retail_price_paisa" | "wholesale_price_paisa">, customer: CustomerType = "retail"): number {
-  if (customer === "wholesale" && product.wholesale_price_paisa !== null) {
+export function unitPrice(product: PriceFields, customer: CustomerType = "retail"): number {
+  if (customer === "wholesale" && product.wholesale_price_paisa != null) {
     return product.wholesale_price_paisa;
   }
   return product.retail_price_paisa;
@@ -29,7 +32,7 @@ export function discount(product: Pick<Product, "retail_price_paisa" | "compare_
 }
 
 export type PricedLine = {
-  product: Pick<Product, "retail_price_paisa" | "wholesale_price_paisa">;
+  product: PriceFields;
   quantity: number;
 };
 

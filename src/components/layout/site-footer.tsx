@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone, Tractor } from "lucide-react";
-import { telHref, whatsappHref } from "@/lib/contact";
+import { mailtoHref, telHref, whatsappHref } from "@/lib/contact";
 import type { Category } from "@/types/catalog";
 import type { StoreSettings } from "@/types/store";
 
@@ -8,6 +8,7 @@ const heading = "font-display text-headline-sm text-footer-foreground";
 const link = "text-body-md text-footer-muted hover:text-footer-foreground hover:underline";
 
 export function SiteFooter({ settings, categories }: { settings: StoreSettings; categories: Category[] }) {
+  const mailto = mailtoHref(settings.email);
   return (
     <footer className="bg-footer pb-20 text-footer-foreground lg:pb-0">
       <div className="mx-auto grid max-w-page gap-8 px-margin py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-margin-desktop">
@@ -88,9 +89,13 @@ export function SiteFooter({ settings, categories }: { settings: StoreSettings; 
             </p>
             <p className="flex gap-2">
               <Mail className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <a href={`mailto:${settings.email}`} className="break-all hover:underline">
-                {settings.email}
-              </a>
+              {mailto ? (
+                <a href={mailto} className="break-all hover:underline">
+                  {settings.email}
+                </a>
+              ) : (
+                <span className="break-all">{settings.email}</span>
+              )}
             </p>
             <p className="flex gap-2">
               <MessageCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
