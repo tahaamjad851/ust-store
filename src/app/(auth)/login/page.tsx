@@ -21,7 +21,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
       footer={
         <>
           New here?{" "}
-          <Link href="/register" className="font-medium text-brand-deep underline underline-offset-4">
+          <Link href="/register" className="inline-flex min-h-11 items-center font-medium text-brand-deep underline underline-offset-4">
             Create an account
           </Link>
         </>

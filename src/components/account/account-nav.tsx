@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, MapPin, ShieldCheck, UserRound } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/features/customers/auth-actions";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +18,7 @@ export function AccountNav({ isStaff }: { isStaff: boolean }) {
 
   return (
     <nav aria-label="Account" className="lg:sticky lg:top-4 lg:self-start">
-      <ul className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1 lg:flex-col lg:overflow-visible">
+      <ul className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1 lg:flex-col lg:flex-nowrap">
         {items.map(({ href, label, icon: Icon, active }) => (
           <li key={href}>
             <Link
@@ -42,10 +41,10 @@ export function AccountNav({ isStaff }: { isStaff: boolean }) {
         )}
         <li className="lg:mt-1 lg:border-t lg:border-border lg:pt-1">
           <form action={logoutAction}>
-            <Button type="submit" variant="ghost" className={cn(itemClass, "h-auto w-full justify-start font-normal")}>
+            <button type="submit" className={cn(itemClass, "w-full")}>
               <LogOut className="size-5" aria-hidden="true" />
               Sign out
-            </Button>
+            </button>
           </form>
         </li>
       </ul>

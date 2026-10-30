@@ -10,9 +10,15 @@ export default async function AuthLayout({ children }: LayoutProps<"/">) {
   const settings = await getStoreSettings();
   return (
     <div className="flex min-h-dvh flex-col bg-surface-low">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-lg bg-card px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Skip to content
+      </a>
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-page items-center justify-between gap-4 px-margin py-3 lg:px-margin-desktop">
-          <Link href="/" className="flex min-w-0 items-center gap-2 rounded-lg">
+          <Link href="/" className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Tractor className="size-6" aria-hidden="true" />
             </span>

@@ -21,9 +21,15 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const roleLabel = user.role === "admin" ? "Admin" : "Staff";
   return (
     <div className="flex min-h-dvh flex-col bg-surface-low">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-lg bg-card px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Skip to content
+      </a>
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-page flex-wrap items-center justify-between gap-3 px-margin py-3 lg:px-margin-desktop">
-          <Link href="/admin" className="flex min-w-0 items-center gap-2 rounded-lg">
+          <Link href="/admin" className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Tractor className="size-6" aria-hidden="true" />
             </span>
@@ -33,8 +39,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             </span>
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="flex items-center gap-2 text-body-md">
-              <span className="font-medium" data-testid="admin-user-name">
+            <p className="flex min-w-0 items-center gap-2 text-body-md">
+              <span className="min-w-0 break-all font-medium" data-testid="admin-user-name">
                 {user.fullName ?? user.email ?? "Signed in"}
               </span>
               <Badge variant="outline" data-testid="admin-user-role">

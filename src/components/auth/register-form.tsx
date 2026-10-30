@@ -41,7 +41,9 @@ export function RegisterForm() {
   if (sent) {
     return (
       <div className="space-y-3">
-        <FormAlert tone="success">{sent}</FormAlert>
+        <FormAlert tone="success" moveFocus>
+          {sent}
+        </FormAlert>
         <p className="text-body-md text-muted-foreground">
           The email can take a few minutes and may land in your spam folder. If it does not arrive, register again with the
           same address and we will send it again.

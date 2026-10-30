@@ -154,7 +154,7 @@ export function AddressForm({ addressId, defaults }: Props) {
         </Field>
       </div>
 
-      <div className="flex items-center gap-3 rounded-lg bg-surface-low p-3">
+      <div className="flex items-center gap-3 rounded-lg bg-surface-low px-3">
         <Controller
           control={control}
           name="is_default"
@@ -163,11 +163,11 @@ export function AddressForm({ addressId, defaults }: Props) {
               id="address-default"
               checked={field.value}
               onCheckedChange={(v) => field.onChange(v === true)}
-              className="size-5"
+              className="relative size-5 after:absolute after:-inset-3 after:content-['']"
             />
           )}
         />
-        <Label htmlFor="address-default" className="text-body-md font-normal">
+        <Label htmlFor="address-default" className="min-h-11 flex-1 text-body-md font-normal">
           Use this as my default delivery address
         </Label>
       </div>

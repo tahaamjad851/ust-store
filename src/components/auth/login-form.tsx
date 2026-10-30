@@ -55,8 +55,8 @@ export function LoginForm({ next }: { next?: string }) {
           {...register("password")}
         />
       </Field>
-      <div className="text-right">
-        <Link href="/forgot-password" className="text-label-lg text-brand-deep underline-offset-4 hover:underline">
+      <div className="-mt-2 text-right">
+        <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-label-lg text-brand-deep underline underline-offset-4">
           Forgot your password?
         </Link>
       </div>

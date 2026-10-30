@@ -44,7 +44,7 @@ export function ResetPasswordForm() {
         <FormAlert tone="error">
           {formError}{" "}
           {expired && (
-            <Link href="/forgot-password" className="font-medium underline underline-offset-4">
+            <Link href="/forgot-password" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
               Request a new link
             </Link>
           )}

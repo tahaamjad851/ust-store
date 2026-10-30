@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Pencil, Star, Trash2 } from "lucide-react";
 import { FormAlert } from "@/components/forms/form-alert";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,16 @@ export function AddressCard({ address }: { address: AddressView }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string>();
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+
+  // The buttons swap places when confirming, so move the keyboard focus along with them.
+  useEffect(() => {
+    if (confirming) keepRef.current?.focus();
+    else if (wasConfirming.current) deleteRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
 
   const run = (action: () => ReturnType<typeof deleteAddressAction>) => {
     setError(undefined);
@@ -77,14 +87,14 @@ export function AddressCard({ address }: { address: AddressView }) {
         {confirming ? (
           <>
             <Button variant="destructive" className="h-11" disabled={pending} onClick={() => run(() => deleteAddressAction(address.id))}>
-              Yes, delete
+              Yes, delete<span className="sr-only"> {address.label ?? "address"}</span>
             </Button>
-            <Button variant="ghost" className="h-11" disabled={pending} onClick={() => setConfirming(false)}>
+            <Button ref={keepRef} variant="ghost" className="h-11" disabled={pending} onClick={() => setConfirming(false)}>
               Keep it
             </Button>
           </>
         ) : (
-          <Button variant="ghost" className="h-11 text-destructive hover:text-destructive" disabled={pending} onClick={() => setConfirming(true)}>
+          <Button ref={deleteRef} variant="ghost" className="h-11 text-destructive hover:text-destructive" disabled={pending} onClick={() => setConfirming(true)}>
             <Trash2 className="size-4" aria-hidden="true" />
             Delete<span className="sr-only"> {address.label ?? "address"}</span>
           </Button>

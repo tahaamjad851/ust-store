@@ -6,8 +6,9 @@ export function applyActionResult<T extends FieldValues>(
   result: Extract<ActionResult, { ok: false }>,
   setError: UseFormSetError<T>,
 ): string | undefined {
-  for (const [name, message] of Object.entries(result.fieldErrors ?? {})) {
-    setError(name as Path<T>, { type: "server", message });
-  }
+  Object.entries(result.fieldErrors ?? {}).forEach(([name, message], index) => {
+    // Focus the first field with a problem, as the browser-side check does.
+    setError(name as Path<T>, { type: "server", message }, { shouldFocus: index === 0 });
+  });
   return result.message;
 }

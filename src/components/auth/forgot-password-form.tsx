@@ -37,7 +37,9 @@ export function ForgotPasswordForm() {
   if (sent) {
     return (
       <div className="space-y-3">
-        <FormAlert tone="success">{sent}</FormAlert>
+        <FormAlert tone="success" moveFocus>
+          {sent}
+        </FormAlert>
         <p className="text-body-md text-muted-foreground">The email can take a few minutes. Check your spam folder too.</p>
       </div>
     );

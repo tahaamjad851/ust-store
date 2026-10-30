@@ -16,7 +16,7 @@ export default async function AccountLayout({ children }: LayoutProps<"/account"
       <div className="mx-auto w-full max-w-page px-margin py-8 lg:px-margin-desktop">
         <div className="mb-6">
           <h1 className="text-headline-lg-mobile text-brand-deep lg:text-headline-lg">My account</h1>
-          <p className="text-body-md text-muted-foreground">Signed in as {user.email ?? user.fullName ?? "your account"}</p>
+          <p className="text-body-md break-words text-muted-foreground">Signed in as {user.email ?? user.fullName ?? "your account"}</p>
         </div>
         <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
           <AccountNav isStaff={user.role !== null} />

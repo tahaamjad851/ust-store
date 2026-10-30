@@ -7,7 +7,7 @@ export default async function AdminHomePage() {
   const user = await requireStaff({ next: "/admin" });
   return (
     <section aria-labelledby="admin-heading" className="rounded-lg border border-border bg-card p-6">
-      <h1 id="admin-heading" className="text-headline-md">
+      <h1 id="admin-heading" className="text-headline-md break-words">
         Welcome, {user.fullName ?? user.email}
       </h1>
       <p className="mt-2 text-body-md text-muted-foreground">
