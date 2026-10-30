@@ -23,7 +23,11 @@ export function safeNextPath(next: unknown, fallback: string = FALLBACK): string
   if (url.origin !== "http://localhost") return fallback;
   if (AUTH_PAGES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`))) return fallback;
 
-  return `${url.pathname}${url.search}`;
+  // new URL() resolves dot segments, so "/..//evil.example" becomes "//evil.example", which a browser
+  // reads as another site. Check the normalised result, not just the input.
+  const result = `${url.pathname}${url.search}`;
+  if (result.startsWith("//")) return fallback;
+  return result;
 }
 
 /** Login page URL carrying a validated `next` destination, if there is one. */

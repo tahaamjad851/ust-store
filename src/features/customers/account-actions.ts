@@ -61,14 +61,14 @@ export async function createAddressAction(input: unknown): Promise<ActionResult>
 }
 
 export async function updateAddressAction(id: unknown, input: unknown): Promise<ActionResult> {
-  await requireUser({ next: "/account/addresses" });
+  const user = await requireUser({ next: "/account/addresses" });
   const addressId = addressIdSchema.safeParse(id);
   if (!addressId.success) return { ok: false, message: NOT_FOUND };
   const parsed = addressSchema.safeParse(input);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFrom(parsed.error) };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("addresses").update(parsed.data).eq("id", addressId.data).select("id");
+  const { data, error } = await supabase.from("addresses").update(parsed.data).eq("id", addressId.data).eq("user_id", user.id).select("id");
   if (error) {
     console.error("address update failed", error.code);
     return { ok: false, message: MESSAGES.unexpected };
@@ -81,12 +81,12 @@ export async function updateAddressAction(id: unknown, input: unknown): Promise<
 }
 
 export async function deleteAddressAction(id: unknown): Promise<ActionResult> {
-  await requireUser({ next: "/account/addresses" });
+  const user = await requireUser({ next: "/account/addresses" });
   const addressId = addressIdSchema.safeParse(id);
   if (!addressId.success) return { ok: false, message: NOT_FOUND };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("addresses").delete().eq("id", addressId.data).select("id");
+  const { data, error } = await supabase.from("addresses").delete().eq("id", addressId.data).eq("user_id", user.id).select("id");
   if (error) {
     console.error("address delete failed", error.code);
     return { ok: false, message: MESSAGES.unexpected };
@@ -98,13 +98,13 @@ export async function deleteAddressAction(id: unknown): Promise<ActionResult> {
 }
 
 export async function setDefaultAddressAction(id: unknown): Promise<ActionResult> {
-  await requireUser({ next: "/account/addresses" });
+  const user = await requireUser({ next: "/account/addresses" });
   const addressId = addressIdSchema.safeParse(id);
   if (!addressId.success) return { ok: false, message: NOT_FOUND };
 
   // A database trigger clears the previous default in the same statement.
   const supabase = await createClient();
-  const { data, error } = await supabase.from("addresses").update({ is_default: true }).eq("id", addressId.data).select("id");
+  const { data, error } = await supabase.from("addresses").update({ is_default: true }).eq("id", addressId.data).eq("user_id", user.id).select("id");
   if (error) {
     console.error("set default address failed", error.code);
     return { ok: false, message: MESSAGES.unexpected };

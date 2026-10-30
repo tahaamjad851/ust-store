@@ -4,16 +4,21 @@
 // the browser. The limiter fails closed: if the database cannot be reached the action is refused.
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// An email-only bucket would let anyone lock a victim out by failing on purpose, so the tight
+// limits are per (email + IP) and per IP; the email-only buckets are generous ceilings against
+// attacks spread over many addresses.
 export const RATE_LIMITS = {
   login_ip: { limit: 20, windowSeconds: 15 * 60 },
-  login_email: { limit: 8, windowSeconds: 15 * 60 },
+  login_email_ip: { limit: 8, windowSeconds: 15 * 60 },
+  login_email: { limit: 40, windowSeconds: 60 * 60 },
   register_ip: { limit: 5, windowSeconds: 60 * 60 },
   forgot_ip: { limit: 5, windowSeconds: 60 * 60 },
-  forgot_email: { limit: 3, windowSeconds: 60 * 60 },
+  forgot_email_ip: { limit: 3, windowSeconds: 60 * 60 },
+  forgot_email: { limit: 10, windowSeconds: 60 * 60 },
   reset_ip: { limit: 10, windowSeconds: 60 * 60 },
   // Contact and quote-request actions (added with their pages) use this bucket.
   contact_ip: { limit: 5, windowSeconds: 60 * 60 },
@@ -35,12 +40,25 @@ export async function clientIp(): Promise<string> {
   return forwarded || "unknown";
 }
 
+// Keyed hash (HMAC) so that a copy of the table cannot be reversed by trying every IP address or a
+// list of emails. The key is the service-role key, which this code already needs and never exposes.
 function hashSubject(subject: string): string {
-  return createHash("sha256").update(subject.trim().toLowerCase()).digest("hex");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  return createHmac("sha256", key).update(subject.trim().toLowerCase()).digest("hex");
 }
+
+/** True when the caller's address could not be determined (the subject is, or ends in, "unknown"). */
+const ipUnknown = (subject: string) => subject === "unknown" || subject.endsWith("|unknown");
 
 export async function checkRateLimit(bucket: RateLimitBucket, subject: string): Promise<RateLimitResult> {
   const { limit, windowSeconds } = RATE_LIMITS[bucket];
+  // Without an address every visitor would share one bucket and lock each other out. Real hosts set
+  // the header; in local development there is none, so this only applies in production.
+  if (bucket.includes("_ip") && ipUnknown(subject) && process.env.NODE_ENV === "production") {
+    console.error("rate limiter: no client address in request headers", bucket);
+    return { allowed: false, reason: "unavailable" };
+  }
   try {
     const { data, error } = await createAdminClient().rpc("check_rate_limit", {
       p_bucket: bucket,

@@ -24,6 +24,17 @@ describe("safeNextPath", () => {
     expect(safeNextPath(next)).toBe("/account");
   });
 
+  it("never returns a path that a browser would read as another site", () => {
+    for (const next of ["/..//x", "/.//x", "/a/b/../..//x", "/%2e%2e//x", "/x/../../..//y"]) {
+      expect(safeNextPath(next).startsWith("//"), next).toBe(false);
+    }
+  });
+
+  it("still allows harmless dot segments", () => {
+    expect(safeNextPath("/a/../account/addresses")).toBe("/account/addresses");
+    expect(safeNextPath("/./shop")).toBe("/shop");
+  });
+
   it("rejects non-strings", () => {
     expect(safeNextPath(undefined)).toBe("/account");
     expect(safeNextPath(["/a"])).toBe("/account");

@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
   // Recovery is recognised by the link type, or by the destination our reset email asks for.
   const recovery = type === "recovery" || next === "/reset-password";
   if (recovery) {
-    (await cookies()).set(RECOVERY_COOKIE, "1", {
+    // Holds the id of the user who followed the link; the reset action only accepts that same user.
+    (await cookies()).set(RECOVERY_COOKIE, data.user.id, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

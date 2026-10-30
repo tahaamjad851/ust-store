@@ -22,8 +22,10 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFrom(parsed.error) };
   const { email, password, next } = parsed.data;
 
+  const ip = await clientIp();
   const limit = await checkRateLimits([
-    ["login_ip", await clientIp()],
+    ["login_ip", ip],
+    ["login_email_ip", `${email}|${ip}`],
     ["login_email", email],
   ]);
   if (!limit.allowed) return { ok: false, message: rateLimitMessage(limit) };
@@ -92,8 +94,10 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionResult
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFrom(parsed.error) };
   const { email } = parsed.data;
 
+  const ip = await clientIp();
   const limit = await checkRateLimits([
-    ["forgot_ip", await clientIp()],
+    ["forgot_ip", ip],
+    ["forgot_email_ip", `${email}|${ip}`],
     ["forgot_email", email],
   ]);
   if (!limit.allowed) return { ok: false, message: rateLimitMessage(limit) };
@@ -116,14 +120,15 @@ export async function resetPasswordAction(input: unknown): Promise<ActionResult>
   const limit = await checkRateLimits([["reset_ip", await clientIp()]]);
   if (!limit.allowed) return { ok: false, message: rateLimitMessage(limit) };
 
-  // The password may only be changed without the old one right after following a reset link
-  // (the confirm route sets this short-lived cookie), never from an ordinary signed-in session.
+  // The reset page only works right after following a reset link: the confirm route sets this
+  // short-lived cookie holding the id of the user who followed it. This guards the website's own
+  // form; the Supabase "Secure password change" setting guards the Auth API itself (docs/AUTH.md).
   const cookieStore = await cookies();
-  if (!cookieStore.get(RECOVERY_COOKIE)) return { ok: false, message: MESSAGES.linkExpired };
-
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user || userData.user.is_anonymous) return { ok: false, message: MESSAGES.linkExpired };
+  if (!userData.user || userData.user.is_anonymous || cookieStore.get(RECOVERY_COOKIE)?.value !== userData.user.id) {
+    return { ok: false, message: MESSAGES.linkExpired };
+  }
 
   try {
     if (!(await isAccountEnabled(supabase, userData.user.id))) {
@@ -152,6 +157,7 @@ export async function resetPasswordAction(input: unknown): Promise<ActionResult>
 }
 
 export async function logoutAction(): Promise<void> {
+  (await cookies()).delete(RECOVERY_COOKIE);
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "local" });
   redirect("/");

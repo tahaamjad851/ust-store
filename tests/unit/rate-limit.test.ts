@@ -13,6 +13,8 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
 import { checkRateLimit, checkRateLimits, clientIp, RATE_LIMITS, rateLimitMessage } from "@/lib/auth/rate-limit";
 
 beforeEach(() => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
+  vi.unstubAllEnvs();
   rpc.mockReset();
   headerValues = {};
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -21,11 +23,12 @@ beforeEach(() => {
 describe("checkRateLimit", () => {
   it("never sends the raw subject to the database", async () => {
     rpc.mockResolvedValue({ data: [{ allowed: true, retry_after_seconds: 0 }], error: null });
-    await checkRateLimit("login_email", "Ali@Example.com");
+    await checkRateLimit("login_email_ip", "Ali@Example.com|1.2.3.4");
     const args = rpc.mock.calls[0][1];
     expect(args.p_key).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(args)).not.toContain("example.com");
-    expect(args).toMatchObject({ p_bucket: "login_email", p_limit: 8, p_window_seconds: 900 });
+    expect(JSON.stringify(args)).not.toContain("1.2.3.4");
+    expect(args).toMatchObject({ p_bucket: "login_email_ip", p_limit: 8, p_window_seconds: 900 });
   });
 
   it("treats the same address in any case as one subject", async () => {
@@ -55,6 +58,24 @@ describe("checkRateLimit", () => {
     await expect(checkRateLimit("login_ip", "x")).resolves.toEqual({ allowed: false, reason: "unavailable" });
     rpc.mockResolvedValueOnce({ data: [{ nope: true }], error: null });
     await expect(checkRateLimit("login_ip", "x")).resolves.toEqual({ allowed: false, reason: "unavailable" });
+  });
+
+  it("keys the hash on a server secret, so a copy of the table cannot be reversed without it", async () => {
+    rpc.mockResolvedValue({ data: [{ allowed: true, retry_after_seconds: 0 }], error: null });
+    await checkRateLimit("login_ip", "1.2.3.4");
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "another-key";
+    await checkRateLimit("login_ip", "1.2.3.4");
+    expect(rpc.mock.calls[0][1].p_key).not.toBe(rpc.mock.calls[1][1].p_key);
+  });
+
+  it("refuses per-IP buckets in production when the caller's address is unknown", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    await expect(checkRateLimit("login_ip", "unknown")).resolves.toEqual({ allowed: false, reason: "unavailable" });
+    await expect(checkRateLimit("login_email_ip", "a@b.co|unknown")).resolves.toEqual({ allowed: false, reason: "unavailable" });
+    expect(rpc).not.toHaveBeenCalled();
+    // The email-only ceiling does not depend on the address.
+    rpc.mockResolvedValue({ data: [{ allowed: true, retry_after_seconds: 0 }], error: null });
+    await expect(checkRateLimit("login_email", "a@b.co")).resolves.toEqual({ allowed: true });
   });
 
   it("has a bucket for contact-type actions", () => {

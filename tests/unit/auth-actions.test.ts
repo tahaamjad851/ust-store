@@ -36,7 +36,7 @@ const supabase = {
 };
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => supabase }));
 
-import { forgotPasswordAction, loginAction, registerAction, resetPasswordAction } from "@/features/customers/auth-actions";
+import { forgotPasswordAction, loginAction, logoutAction, registerAction, resetPasswordAction } from "@/features/customers/auth-actions";
 import { MESSAGES } from "@/features/customers/types";
 
 const user = { id: "u1", is_anonymous: false };
@@ -70,10 +70,11 @@ describe("loginAction", () => {
     expect(auth.signInWithPassword).not.toHaveBeenCalled();
   });
 
-  it("rate limits by IP and by email", async () => {
+  it("rate limits by IP, by email+IP and by a generous email-only ceiling", async () => {
     await expect(loginAction(input)).rejects.toThrow("REDIRECT:");
     expect(checkRateLimits).toHaveBeenCalledWith([
       ["login_ip", "1.2.3.4"],
+      ["login_email_ip", "ali@example.com|1.2.3.4"],
       ["login_email", "ali@example.com"],
     ]);
   });
@@ -185,6 +186,7 @@ describe("forgotPasswordAction", () => {
     await forgotPasswordAction({ email: "Someone@Example.com" });
     expect(checkRateLimits).toHaveBeenCalledWith([
       ["forgot_ip", "1.2.3.4"],
+      ["forgot_email_ip", "someone@example.com|1.2.3.4"],
       ["forgot_email", "someone@example.com"],
     ]);
   });
@@ -204,15 +206,21 @@ describe("resetPasswordAction", () => {
     expect(auth.updateUser).not.toHaveBeenCalled();
   });
 
+  it("rejects a cookie that belongs to a different user", async () => {
+    cookieJar.set("ust-recovery", "someone-else");
+    await expect(resetPasswordAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.linkExpired });
+    expect(auth.updateUser).not.toHaveBeenCalled();
+  });
+
   it("needs a session as well", async () => {
-    cookieJar.set("ust-recovery", "1");
+    cookieJar.set("ust-recovery", "u1");
     auth.getUser.mockResolvedValue({ data: { user: null }, error: { message: "no session" } });
     await expect(resetPasswordAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.linkExpired });
     expect(auth.updateUser).not.toHaveBeenCalled();
   });
 
   it("does not let a disabled account change its password", async () => {
-    cookieJar.set("ust-recovery", "1");
+    cookieJar.set("ust-recovery", "u1");
     profileRow = { disabled_at: "2026-10-30T00:00:00Z" };
     await expect(resetPasswordAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.accountDisabled });
     expect(auth.updateUser).not.toHaveBeenCalled();
@@ -220,7 +228,7 @@ describe("resetPasswordAction", () => {
   });
 
   it("validates the new password on the server", async () => {
-    cookieJar.set("ust-recovery", "1");
+    cookieJar.set("ust-recovery", "u1");
     await expect(resetPasswordAction({ password: "short", confirm_password: "short" })).resolves.toMatchObject({
       ok: false,
       fieldErrors: { password: expect.any(String) },
@@ -229,7 +237,7 @@ describe("resetPasswordAction", () => {
   });
 
   it("saves the password, ends the other sessions, clears the cookie and goes to the account", async () => {
-    cookieJar.set("ust-recovery", "1");
+    cookieJar.set("ust-recovery", "u1");
     await expect(resetPasswordAction(input)).rejects.toThrow("REDIRECT:/account");
     expect(auth.updateUser).toHaveBeenCalledWith({ password: "newtractor1" });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: "others" });
@@ -237,9 +245,18 @@ describe("resetPasswordAction", () => {
   });
 
   it("reports a reused password on the field", async () => {
-    cookieJar.set("ust-recovery", "1");
+    cookieJar.set("ust-recovery", "u1");
     auth.updateUser.mockResolvedValue({ data: {}, error: { code: "same_password", status: 422 } });
     await expect(resetPasswordAction(input)).resolves.toMatchObject({ ok: false, fieldErrors: { password: expect.any(String) } });
     expect(cookieJar.has("ust-recovery")).toBe(true);
+  });
+});
+
+describe("logoutAction", () => {
+  it("signs out locally and drops the reset cookie", async () => {
+    cookieJar.set("ust-recovery", "u1");
+    await expect(logoutAction()).rejects.toThrow("REDIRECT:/");
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(cookieJar.has("ust-recovery")).toBe(false);
   });
 });
