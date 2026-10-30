@@ -36,6 +36,12 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   const user = data.user;
+  // Supabase being unreachable (no status) or failing (5xx) says nothing about the visitor: do not
+  // send a signed-in customer to the login page for it.
+  if (error && (!error.status || error.status >= 500)) {
+    console.error("session check failed: Supabase Auth unavailable", error.name, error.code ?? error.status);
+    throw new Error("Could not load the account.");
+  }
   if (error || !user || user.is_anonymous) return { status: "anonymous" };
 
   const [profile, role] = await Promise.all([
@@ -48,7 +54,15 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
     throw new Error("Could not load the account.");
   }
 
-  if (!profile.data || profile.data.disabled_at) return { status: "disabled" };
+  // Every account gets a profile in the same transaction that creates the user, so no row for a
+  // verified user means something is wrong (for example the request reached the database without the
+  // user's token and row-level security hid the row). That is an error, never "disabled": a valid user
+  // must not be bounced to /auth/disabled for it. Only an explicit disabled_at disables an account.
+  if (!profile.data) {
+    console.error("account lookup found no profile for a verified user");
+    throw new Error("Could not load the account.");
+  }
+  if (profile.data.disabled_at) return { status: "disabled" };
 
   return {
     status: "ok",

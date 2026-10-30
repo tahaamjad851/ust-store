@@ -18,10 +18,8 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    // Visits the signed-in routes once so the dev server has compiled them (see the file).
-    { name: "warm-up", testMatch: /warm-up\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile", dependencies: ["warm-up"], use: { ...devices["Pixel 7"] } },
-    { name: "desktop", dependencies: ["warm-up"], use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined

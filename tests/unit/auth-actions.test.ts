@@ -136,10 +136,11 @@ describe("loginAction", () => {
     expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
-  it("treats a missing profile like a disabled account", async () => {
+  it("does not call an account disabled when its profile row is missing: generic error, no session, logged", async () => {
     profileRow = null;
-    await expect(loginAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.accountDisabled });
-    expect(auth.signOut).toHaveBeenCalled();
+    await expect(loginAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.unexpected });
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(console.error).toHaveBeenCalledWith("account status lookup found no profile");
   });
 
   it("refuses anonymous Supabase users", async () => {

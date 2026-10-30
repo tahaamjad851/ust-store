@@ -18,6 +18,8 @@ type Fixture = {
   role?: { role: "admin" | "staff" } | null;
   profileError?: boolean;
   roleError?: boolean;
+  /** What auth.getUser() reports. Defaults to "no session" (a 400 in supabase-js) when there is no user. */
+  userError?: { name: string; status?: number; code?: string };
 };
 
 let fixture: Fixture;
@@ -25,7 +27,10 @@ let fixture: Fixture;
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: {
-      getUser: async () => ({ data: { user: fixture.user }, error: fixture.user ? null : { message: "no session" } }),
+      getUser: async () => ({
+        data: { user: fixture.user },
+        error: fixture.userError ?? (fixture.user ? null : { name: "AuthSessionMissingError", message: "no session", status: 400 }),
+      }),
     },
     from: (table: string) => ({
       select: () => ({
@@ -92,10 +97,31 @@ describe("requireUser", () => {
     await expect(requireAdmin()).rejects.toThrow("REDIRECT:/auth/disabled");
   });
 
-  it("treats a missing profile as blocked", async () => {
-    fixture.profile = null;
+  it("never calls a valid user disabled just because no profile row came back", async () => {
+    fixture.profile = null; // read succeeded but returned nothing (e.g. the request reached the database without the user's token)
+    const { requireUser, requireStaff, requireAdmin } = await guards();
+    for (const guard of [requireUser, requireStaff, requireAdmin]) {
+      await expect(guard()).rejects.toThrow("Could not load the account.");
+    }
+    expect(console.error).toHaveBeenCalledWith("account lookup found no profile for a verified user");
+  });
+
+  it("does not send a signed-in user to the login page when Supabase Auth is unreachable or failing", async () => {
+    for (const userError of [
+      { name: "AuthRetryableFetchError", status: 0 },
+      { name: "AuthApiError", status: 503, code: "unexpected_failure" },
+    ]) {
+      fixture.userError = userError;
+      const { requireUser } = await guards();
+      await expect(requireUser()).rejects.toThrow("Could not load the account.");
+    }
+  });
+
+  it("still treats a rejected or expired token as signed out", async () => {
+    fixture.user = null;
+    fixture.userError = { name: "AuthApiError", status: 401, code: "bad_jwt" };
     const { requireUser } = await guards();
-    await expect(requireUser()).rejects.toThrow("REDIRECT:/auth/disabled");
+    await expect(requireUser()).rejects.toThrow("REDIRECT:/login");
   });
 
   it("returns the customer", async () => {

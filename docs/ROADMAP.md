@@ -122,6 +122,16 @@ The user's rerun: the warm-up still failed on a sign-in with "Something went wro
 
 Verified here: lint, typecheck, build, 115 unit tests (4 new). The cookie format of `signInWithSession` was checked against a local fake Supabase only. **Not** run here: any e2e test against the DEV project.
 
+### Missing profile is not "disabled"; warm-up removed (2026-10-31)
+
+The user confirmed manual sign-in works (so the failure is in the e2e set-up) and that the Supabase `400`/`422` entries are the tests' intended wrong-password and anonymous-sign-in checks. Their failing run's server log also showed an error for `/admin` ending in a redirect to `/auth/disabled`, thrown from `requireUser`. I did not see that line myself (the log I could read had been overwritten and held no errors).
+
+- **Real defect found and fixed:** `getAuthState()` returned `disabled` when the profile read succeeded but returned **no row**, and `isAccountEnabled()` returned `false` for the same case. A valid user could therefore be sent to `/auth/disabled` (which re-checks and, if the read now works, bounces them to `/account`) after a read that came back empty, for example when a request reaches the database without the user's token and row-level security hides the row. Every account gets a profile in the transaction that creates the user, so a missing row means a fault, not a disabled account. Now: no row → logged error and the "Could not load the account" error page (fail closed, no sign-out, no "disabled" message); `disabled` only for an explicit `disabled_at`; the sign-in action answers the generic message and signs the half-made session out. Also, a Supabase Auth outage (network failure or 5xx) in `getAuthState()` no longer looks like "signed out" and no longer sends a signed-in user to the login page: it is an error page, logged. A rejected or expired token still means signed out. Unit tests cover all of these (guards and login action).
+- **Whether this was the cause of the warm-up failure is not established.** It is the one place in the code that can turn a valid user into a redirect to `/auth/disabled`, and it matches that log line, but I could not reproduce an empty profile read, and I cannot read the hosted logs. The new server logging (`account lookup found no profile for a verified user`, `session check failed…`, `sign-in failed…`) will show it after one more run.
+- **Warm-up project removed.** With set-up sign-ins done by session (no login form) and `page.goto` waiting for cold compiles, its job was gone, and while failing it blocked the whole suite. `signInThroughUi` (waits for the navigation, fails with the alert text and diagnostics) and `signInWithSession` stay.
+
+Verified here: lint, typecheck, build, unit tests (counts in the report). **Not** run here: any e2e or `test:db` run against the DEV project.
+
 ## Phase 0: Setup
 
 Rules: follow every rule in CLAUDE.md. Never read or print `.env*` files (except `.env.example`), `client-data/` or `private/`.
