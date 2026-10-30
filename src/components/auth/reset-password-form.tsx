@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { applyActionResult } from "@/components/forms/apply-action-result";
 import { Field, fieldProps } from "@/components/forms/field";
 import { FormAlert } from "@/components/forms/form-alert";
+import { isRedirectError } from "@/components/forms/is-redirect-error";
 import { PasswordInput } from "@/components/forms/password-input";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { resetPasswordAction } from "@/features/customers/auth-actions";
@@ -31,7 +32,9 @@ export function ResetPasswordForm() {
     try {
       const result = await resetPasswordAction(getValues());
       if (!result.ok) setFormError(applyActionResult(result, setError));
-    } catch {
+    } catch (error) {
+      // A redirect (the action succeeded) reaches the caller as a rejection; it is not a failure.
+      if (isRedirectError(error)) return;
       setFormError(MESSAGES.unexpected);
     }
   });

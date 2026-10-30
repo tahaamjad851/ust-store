@@ -8,6 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Addresses" };
 
+// Blocking, like the layout: the page reads the signed-in user's data for every request. (A loading.tsx
+// would stream the page instead, which sends status 200 before notFound() is decided.)
+export const instant = false;
+
 const MAX_ADDRESSES = 10;
 
 export default async function AddressesPage() {

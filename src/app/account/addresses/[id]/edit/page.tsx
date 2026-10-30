@@ -8,6 +8,10 @@ import { PROVINCES } from "@/lib/validation/checkout";
 
 export const metadata: Metadata = { title: "Edit address" };
 
+// Blocking, like the layout: the page reads the signed-in user's data for every request. (A loading.tsx
+// would stream the page instead, which sends status 200 before notFound() is decided.)
+export const instant = false;
+
 export default async function EditAddressPage({ params }: PageProps<"/account/addresses/[id]/edit">) {
   const { id } = await params;
   const user = await requireUser({ next: `/account/addresses/${encodeURIComponent(id)}/edit` });

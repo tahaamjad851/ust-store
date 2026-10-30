@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { applyActionResult } from "@/components/forms/apply-action-result";
 import { Field, fieldInputClass, fieldProps } from "@/components/forms/field";
 import { FormAlert } from "@/components/forms/form-alert";
+import { isRedirectError } from "@/components/forms/is-redirect-error";
 import { PasswordInput } from "@/components/forms/password-input";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ export function LoginForm({ next }: { next?: string }) {
       const result = await loginAction({ ...getValues(), next });
       if (!result.ok) setFormError(applyActionResult(result, setError));
     } catch (error) {
+      // Signing in successfully redirects, and Next reports a redirect to the caller as a rejection.
+      if (isRedirectError(error)) return;
       // The visitor gets the generic message; the cause (network drop, aborted request, a render
       // that threw after the redirect) must still be findable in the browser console.
       console.error("sign-in request failed", error);

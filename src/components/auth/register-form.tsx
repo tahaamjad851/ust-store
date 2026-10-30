@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { applyActionResult } from "@/components/forms/apply-action-result";
 import { Field, fieldInputClass, fieldProps } from "@/components/forms/field";
 import { FormAlert } from "@/components/forms/form-alert";
+import { isRedirectError } from "@/components/forms/is-redirect-error";
 import { PasswordInput } from "@/components/forms/password-input";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,9 @@ export function RegisterForm() {
       const result = await registerAction(getValues());
       if (result.ok) setSent(result.message);
       else setFormError(applyActionResult(result, setError));
-    } catch {
+    } catch (error) {
+      // A redirect (the action succeeded) reaches the caller as a rejection; it is not a failure.
+      if (isRedirectError(error)) return;
       setFormError(MESSAGES.unexpected);
     }
   });

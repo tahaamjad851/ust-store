@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { applyActionResult } from "@/components/forms/apply-action-result";
 import { Field, fieldInputClass, fieldProps } from "@/components/forms/field";
 import { FormAlert } from "@/components/forms/form-alert";
+import { isRedirectError } from "@/components/forms/is-redirect-error";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,7 +42,9 @@ export function AddressForm({ addressId, defaults }: Props) {
       const values = getValues();
       const result = addressId ? await updateAddressAction(addressId, values) : await createAddressAction(values);
       if (!result.ok) setFormError(applyActionResult(result, setError));
-    } catch {
+    } catch (error) {
+      // A redirect (the action succeeded) reaches the caller as a rejection; it is not a failure.
+      if (isRedirectError(error)) return;
       setFormError(MESSAGES.unexpected);
     }
   });

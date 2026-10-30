@@ -4,6 +4,10 @@ import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Your details" };
 
+// Blocking, like the layout: the page reads the signed-in user's data for every request. (A loading.tsx
+// would stream the page instead, which sends status 200 before notFound() is decided.)
+export const instant = false;
+
 export default async function AccountPage() {
   // Checked here as well as in the layout: layouts do not re-render on client navigation.
   const user = await requireUser({ next: "/account" });
