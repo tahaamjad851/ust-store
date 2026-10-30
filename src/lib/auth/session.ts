@@ -6,6 +6,7 @@ import "server-only";
 
 import { cache } from "react";
 import { forbidden, redirect } from "next/navigation";
+import { connection } from "next/server";
 import { loginUrl } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,6 +29,10 @@ export type AuthState = { status: "anonymous" } | { status: "disabled" } | { sta
  * and role through RLS. Memoised per request. Anonymous Supabase users never count as signed in.
  */
 export const getAuthState = cache(async (): Promise<AuthState> => {
+  // supabase-js reads the clock to see whether the session has expired. Cache Components treats that
+  // as an unstable value in any prerender, including the dev-time validation render where cookies are
+  // already available. Whose session this is can only be known for a real request, so wait for one.
+  await connection();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   const user = data.user;
