@@ -19,8 +19,8 @@ This file is the single source of truth for phase status and decisions. The prod
 |---|---|---|
 | 0. Setup | main | Done (`877385a`) |
 | UI foundation (storefront pages from Stitch, DEMO data) | feat/ui-foundation | Done, merged to main (`c10c9a9`) |
-| 1. Database | feat/database | Built and reviewed; waiting for the user to push to the dev project and run `npm run test:db` |
-| 2. Auth | feat/auth | Proposed (below), waiting for "go" |
+| 1. Database | feat/database | Done, verified and merged |
+| 2. Auth & accounts | feat/auth | Built and reviewed; waiting for the user to apply the migration, configure the dev project and run the dev-project tests (see `docs/AUTH.md`) |
 
 ## Decisions
 
@@ -39,6 +39,8 @@ Decisions that override or narrow the spec (`docs/ust.txt`). Newest last.
 | 2026-10-29 | Order numbers are `UST-<year>-<6 digits>`, restarting at 000001 each year (Asia/Karachi). | – |
 | 2026-10-29 | Demo categories are limited to a tractor parts and lubricants shop. No bike or car parts. | Spec §27 sample data |
 | 2026-10-29 | `services/catalog.ts` keeps reading the DEMO mock until Phase 3 (catalog). Phase 2 is auth. | – |
+| 2026-10-30 | Phase 2 sign-in is email + password only; anonymous sign-ins stay rejected. Auth pages use the existing design system. Rate limiting is Postgres-backed (no new service). | Phase 2 proposal questions 1, 3, 4 |
+| 2026-10-30 | Supabase's built-in mailer for now. **Configure custom SMTP (for example Resend) before the Phase 4 staging deploy.** | Phase 2 proposal question 2 |
 
 ## Phase 1: Database
 
@@ -70,22 +72,33 @@ Low findings left open:
 - COD orders never auto-expire (staff cancel stale ones; open-order cap limits abuse).
 - `npm audit`: 3 low (deepmerge via the `shadcn` dev CLI), pre-existing.
 
-## Phase 2: Auth (proposal)
+## Phase 2: Auth & accounts
 
-Branch `feat/auth`. Supabase Auth with email + password, wired into the existing UI. Catalog stays on mock data (Phase 3).
+Branch `feat/auth`. Supabase Auth with email + password. Catalog stays on mock data (Phase 3). Details, setup steps, limits and test commands: `docs/AUTH.md`.
 
-- `src/proxy.ts` session refresh with `@supabase/ssr`; `src/lib/auth`: `getUser()`, `requireUser()`, `requireStaff()`/`requireAdmin()` (server-side, via `is_admin()`/`is_full_admin()`), used by `/account` and `/admin` layouts.
-- `(auth)` routes: register, login, logout, forgot password, reset password, email confirmation callback; react-hook-form + zod; generic error messages (no account enumeration).
-- `/account`: minimal profile page (name, phone, company) using the column-limited profile update; header Account link becomes live.
-- `/admin`: protected shell only (403 for customers, redirect for guests).
-- Disabled accounts: blocked at sign-in and on every protected request; admin "disable" will also ban the user in Supabase Auth (service role, Phase 6 UI).
-- Tests: unit (schemas), Playwright e2e (register → confirm link via test mailbox or admin-created user, login, logout, reset; `/account` and `/admin` redirects; customer gets 403 on `/admin`).
+### Phase 2 report (2026-10-30)
 
-Decisions needed before "go":
-1. Auth page design: Stitch has no login/register screens. Build them in the existing design language, or provide designs?
-2. Email delivery: Supabase's built-in mailer is heavily rate-limited (a few emails/hour). Use a custom SMTP provider (e.g. Resend) now, or later?
-3. Sign-in methods: email + password only, or also phone OTP / Google?
-4. Rate limiting for the Next.js server actions (guest checkout later): a Postgres-backed limiter (no new service) or Upstash Redis?
+Built:
+- Migration `20261030100000_auth_support.sql`: Postgres rate limiter (`rate_limits`, `check_rate_limit()` for the service role only); API roles can no longer read the staff identity columns `order_status_history.actor_id`, `payments.verified_by`, `shipments.created_by`, `refunds.created_by` (the open low finding; staff see the actor in `audit_log`; `internal_notes` was already staff-only); address integrity (one default, first address is default, deleting the default promotes another, max 10).
+- `src/proxy.ts` session refresh and optimistic redirects; server-side `requireUser()`, `requireStaff()`, `requireAdmin()` used by the `/account` and `/admin` layouts, pages and actions (customers get a real 403, disabled accounts are signed out, anonymous users are rejected, database errors fail closed).
+- Pages: login, register, forgot password, reset password, email confirmation callback, logout; `/account` (profile, addresses: add, edit, delete, set default); `/admin` shell showing the staff name and role. Generic error messages, Zod validation on the server, same-site redirects only.
+
+Verified:
+- `npm run lint`, `npm run typecheck`, `npm run build` pass. 97 unit tests pass (schemas, safe redirects including dot-segment bypasses, guards, rate-limit helper, auth actions).
+- All 10 migrations run on a local Postgres 17 (PGlite, stubbed Supabase `auth`/`storage`; the harness lives outside the repo): 51 SQL checks pass (limiter, column privileges for customer/staff/service role, internal notes, address rules and isolation).
+- 14 Playwright tests pass against the real dev server (mobile and desktop): visitors are redirected from `/account`, `/admin` and deeper account pages with a real 307; the auth pages render; browser-side validation.
+- Reviews: security-reviewer (1 high, 3 medium, 4 low) and ui-designer. The high (open redirect through `/..//host`), the mediums (lockout abuse through email-only limits, overclaimed reset protection, public Supabase Auth endpoints not covered by the app limiter) and the UI findings are fixed or documented.
+
+Written but **not run** (need the DEV project and the migration applied): `tests/e2e/auth.spec.ts` (wrong password, rate limit, disabled user, `/admin` 403, another customer's address, account journey) and `tests/integration/db/auth-support.test.ts`. Registration and password-reset emails are untested end to end (no test mailbox); they are covered by unit tests and review.
+
+Low findings left open:
+- A disabled customer who keeps a valid token can still call the API directly until it expires; row-level security does not check `disabled_at`. Phase 6's disable action **must** also ban the user in Supabase Auth.
+- Supabase Auth's endpoints are public, so the app's limits and password policy do not cover direct calls; the dashboard settings (password rules, secure password change, CAPTCHA, rate limits) do. They are manual steps (`docs/AUTH.md`).
+- The e2e project guard checks that `DB_TEST_PROJECT_REF` matches the URL, not that the project is "dev".
+- The 10-address cap is not race-proof; the header shows a plain "Account" link; no password/email change screens; a mail scanner can consume a one-time link.
+- Screens reachable only when signed in (account pages on a 360px phone, address buttons) were reviewed from code, not visually.
+
+Needs from the user: apply the migration, the dashboard settings and email templates, `NEXT_PUBLIC_SITE_URL`, first admin account, then run the tests (`docs/AUTH.md`).
 
 ## Phase 0: Setup
 
