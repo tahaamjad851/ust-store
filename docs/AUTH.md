@@ -66,7 +66,7 @@ The IP comes from `x-real-ip` / `x-forwarded-for`, which Vercel sets itself. If 
 ## Tests
 
 ```powershell
-npm test                 # unit tests (schemas, safe redirects, guards, rate-limit helper, auth actions)
+npm test                 # unit tests (schemas, safe redirects, guards, rate-limit helper, auth and account actions)
 npm run test:db          # DEV project: includes tests/integration/db/auth-support.test.ts
 npm run test:e2e         # Playwright
 ```
@@ -74,6 +74,7 @@ npm run test:e2e         # Playwright
 - The visitor tests in `tests/e2e/auth-redirects.spec.ts` need only the dev server and `.env.local`.
 - `tests/e2e/auth.spec.ts` (wrong password, rate limit, disabled user, `/admin` 403, address isolation, the account journey) needs the DEV project: the migration above applied, the four Supabase keys and `DB_TEST_PROJECT_REF` in `.env.local`, and the dashboard settings above (email confirmation and anonymous sign-ins do not matter to these tests, which create confirmed users with the service role). It refuses to run when `DB_TEST_PROJECT_REF` does not match `NEXT_PUBLIC_SUPABASE_URL`, and is skipped (with the reason shown) when the keys are missing. It creates users named `ust-e2e-<run>-…@example.test` and deletes them afterwards.
 - First run on a machine: `npx playwright install chromium`.
+- A `warm-up` project (`tests/e2e/warm-up.setup.ts`) runs first. It signs in a throwaway staff user and a customer and visits every signed-in route once, so `npm run dev` has compiled them before the real tests start (otherwise the first sign-ins are slow enough to look like failures). It takes as long as the cold compile of those routes (it has a 4-minute limit), creates and deletes `ust-e2e-*` users like the other tests, and is skipped with the same reason when the keys are missing.
 - Each test file gets its own pretend visitor address through an `x-forwarded-for` header, so the login limit does not carry over between runs.
 
 ## Known limitations

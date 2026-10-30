@@ -84,7 +84,7 @@ Built:
 - Pages: login, register, forgot password, reset password, email confirmation callback, logout; `/account` (profile, addresses: add, edit, delete, set default); `/admin` shell showing the staff name and role. Generic error messages, Zod validation on the server, same-site redirects only.
 
 Verified:
-- `npm run lint`, `npm run typecheck`, `npm run build` pass. 97 unit tests pass (schemas, safe redirects including dot-segment bypasses, guards, rate-limit helper, auth actions).
+- `npm run lint`, `npm run typecheck`, `npm run build` pass. 111 unit tests pass (schemas, safe redirects including dot-segment bypasses, guards, rate-limit helper, auth actions, account actions).
 - All 10 migrations run on a local Postgres 17 (PGlite, stubbed Supabase `auth`/`storage`; the harness lives outside the repo): 51 SQL checks pass (limiter, column privileges for customer/staff/service role, internal notes, address rules and isolation).
 - 14 Playwright tests pass against the real dev server (mobile and desktop): visitors are redirected from `/account`, `/admin` and deeper account pages with a real 307; the auth pages render; browser-side validation.
 - Reviews: security-reviewer (1 high, 3 medium, 4 low) and ui-designer. The high (open redirect through `/..//host`), the mediums (lockout abuse through email-only limits, overclaimed reset protection, public Supabase Auth endpoints not covered by the app limiter) and the UI findings are fixed or documented.
@@ -99,6 +99,16 @@ Low findings left open:
 - Screens reachable only when signed in (account pages on a 360px phone, address buttons) were reviewed from code, not visually.
 
 Needs from the user: apply the migration, the dashboard settings and email templates, `NEXT_PUBLIC_SITE_URL`, first admin account, then run the tests (`docs/AUTH.md`).
+
+### Phase 2 check fixes (2026-10-31)
+
+The user's run of the Phase 2 checks: unit 97 passed, `test:db` 47 passed, e2e 37 passed and 5 failed, plus repeated dev-server errors. Causes and fixes:
+
+1. **`Date.now()` error on every protected route** ("encountered the unstable value Date.now() while prerendering … at AccountLayout / AdminLayout"). supabase-js reads the clock in `auth.getUser()` to see whether the session has expired. Next's dev-time prerender validation has cookies available but treats any time read as unstable. Fix: `await connection()` at the top of `getAuthState()` (`src/lib/auth/session.ts`): who is signed in can only be known for a real request. During a real request or a server action it resolves immediately. Removing that error exposed a second one (the guard now sits outside a `<Suspense>` boundary in each page), so `/account`, `/account/addresses`, `/account/addresses/new`, `/account/addresses/[id]/edit` and `/admin` each got a `loading.tsx` skeleton. Nothing is suppressed. Checked: a fresh `next dev` with a cold compile and a signed-in session produced 0 errors on all five routes (before the fix: the error on every one); `npm run build` is clean and `/account` and `/admin` are still dynamic.
+2. **`farm.getByText("Default")`**: a test bug. `getByText` is a case-insensitive substring match, so it also matched the "Make default" button on every non-default card (checked in a browser: old locator found 1 match on a non-default card, the exact-match badge locator 0). The app shows exactly one default. Fixed with `getByText("Default", { exact: true })`.
+3. **Sign-ins staying on `/login`**: not the rate limiter (a refusal prints an alert; the failure snapshots show a disabled "Sign in" button and no message, i.e. the action was still running). The action was slow because the first sign-in also cold-compiles `/account` in the dev server (4.4 s on its own, with a local mock instead of Supabase), after about 9 round trips to the hosted project, while all workers did the same at once, against the 5 s `expect` timeout. Fixes: a Playwright `warm-up` setup project (`tests/e2e/warm-up.setup.ts`) visits every signed-in route once before the other tests; `signInThroughUi` waits for the redirect as a navigation (not a 5 s assertion) and fails at once, with the alert text, if sign-in is refused. No production limit was changed, no `expect` timeout was raised. **"Enter the receiver's name" not visible**: also a test bug; the receiver's name is pre-filled from the profile, so the test now empties it. That test never reached the server (the form validates in the browser first), so it is renamed, and server-side validation of the account actions now has its own unit tests (`tests/unit/account-actions.test.ts`: invalid input, forged owner, another customer's address, id checks).
+
+Verified here: lint, typecheck, build, 111 unit tests (14 new), 14 visitor e2e tests. **Not** re-run here: the 28 dev-project e2e tests and `test:db` (they need the DEV project); the user re-runs them (`docs/AUTH.md`).
 
 ## Phase 0: Setup
 
