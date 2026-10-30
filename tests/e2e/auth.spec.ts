@@ -193,7 +193,12 @@ test.describe("addresses", () => {
     // Through the website as Bob.
     await signInWithSession(page, bob);
     const response = await page.goto(`/account/addresses/${aliceAddressId}/edit`);
-    expect(response?.status()).toBe(404);
+    // The status is 404 in `npm run dev` but 200 in a production build: this route is partially
+    // prerendered, so its status is sent before notFound() is decided (docs/AUTH.md). What matters is
+    // that Bob sees the not-found page and none of Alice's data.
+    await expect(page.getByText("This page could not be found")).toBeVisible();
+    expect([200, 404]).toContain(response?.status());
+    expect(await response!.text()).not.toContain("Alice");
     await page.goto("/account/addresses");
     await expect(page.getByText("Alice's farm")).toHaveCount(0);
     await expect(page.getByText("No saved addresses yet")).toBeVisible();
@@ -213,12 +218,11 @@ test.describe("addresses", () => {
     await expect(page.getByText("Customer-only street")).toHaveCount(0);
   });
 
-  test("a customer can add, edit, set the default and delete addresses", async ({ page }) => {
-    const user = await createTestUser("journey");
+  test("a customer can save their details", async ({ page }) => {
+    const user = await createTestUser("details");
     await signInWithSession(page, user);
 
-    // Profile
-    await expect(page.getByLabel("Full name")).toHaveValue("E2E journey");
+    await expect(page.getByLabel("Full name")).toHaveValue("E2E details");
     await page.getByLabel("Mobile number").fill("+92 300 7654321");
     await page.getByLabel("Business or shop name").fill("Journey Traders");
     await page.getByRole("button", { name: "Save changes" }).click();
@@ -226,6 +230,15 @@ test.describe("addresses", () => {
     await page.reload();
     await expect(page.getByLabel("Mobile number")).toHaveValue("03007654321");
     await expect(page.getByLabel("Business or shop name")).toHaveValue("Journey Traders");
+  });
+
+  test("a customer can add addresses, and the default follows their choice", async ({ page }) => {
+    const user = await createTestUser("add-address");
+    await signInWithSession(page, user);
+
+    // Visit the list first: in `npm run dev` this compiles it here, not inside the 5 s waits below.
+    await page.goto("/account/addresses");
+    await expect(page.getByText("No saved addresses yet")).toBeVisible();
 
     // First address becomes the default on its own.
     await page.goto("/account/addresses/new");
@@ -258,6 +271,22 @@ test.describe("addresses", () => {
     await farm.getByRole("button", { name: /Make default/ }).click();
     await expect(defaultBadge(farm)).toBeVisible();
     await expect(defaultBadge(workshop)).toHaveCount(0);
+  });
+
+  test("a customer can edit and delete addresses", async ({ page }) => {
+    const user = await createTestUser("edit-address");
+    // Set-up through the API as the customer (RLS applies), so this test is only about edit and delete.
+    const client = await clientFor(user);
+    const base = { full_name: "Ali Khan", phone: "03001234567", province: "Punjab" };
+    const farmRow = await client.from("addresses").insert({ ...base, label: "Farm", line1: "Chak 12/4L", city: "Okara", is_default: true });
+    expect(farmRow.error).toBeNull();
+    const workshopRow = await client.from("addresses").insert({ ...base, label: "Workshop", line1: "Shop 4, Main Bazaar", city: "Depalpur" });
+    expect(workshopRow.error).toBeNull();
+
+    await signInWithSession(page, user, "/account/addresses");
+    const farm = page.getByRole("listitem").filter({ hasText: "Chak 12/4L" });
+    const workshop = page.getByRole("listitem").filter({ hasText: "Shop 4, Main Bazaar" });
+    await expect(defaultBadge(farm)).toBeVisible();
 
     // Edit
     await farm.getByRole("link", { name: /Edit/ }).click();
