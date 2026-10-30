@@ -1,4 +1,9 @@
+import { loadEnvConfig } from "@next/env";
 import { defineConfig, devices } from "@playwright/test";
+
+// Same .env files the dev server uses, so tests that create test users in the DEV Supabase project
+// find the keys. (Only this process reads them; nothing is printed.)
+loadEnvConfig(process.cwd());
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
