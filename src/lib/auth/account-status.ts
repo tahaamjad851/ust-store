@@ -8,6 +8,10 @@ export type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
  */
 export async function isAccountEnabled(supabase: ServerSupabase, userId: string): Promise<boolean> {
   const { data, error } = await supabase.from("profiles").select("disabled_at").eq("id", userId).maybeSingle();
-  if (error) throw new Error("Could not check the account status.");
+  if (error) {
+    // Callers show a generic message; the database's own reason belongs in the server log.
+    console.error("account status lookup failed", error.code, error.message);
+    throw new Error("Could not check the account status.");
+  }
   return data !== null && data.disabled_at === null;
 }

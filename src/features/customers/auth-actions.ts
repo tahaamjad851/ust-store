@@ -17,6 +17,14 @@ function isRateLimited(error: AuthError) {
   return error.status === 429 || error.code === "over_request_rate_limit";
 }
 
+// Codes that mean "these credentials cannot sign in".
+const CREDENTIAL_REFUSALS = new Set(["invalid_credentials", "user_not_found", "user_banned"]);
+
+/** The request never got a real answer (no status: network failure) or Supabase answered with a 5xx. */
+function isServiceFailure(error: AuthError) {
+  return !error.status || error.status >= 500;
+}
+
 export async function loginAction(input: unknown): Promise<ActionResult> {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsFrom(parsed.error) };
@@ -35,7 +43,16 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
   if (error || !data.user) {
     if (error?.code === "email_not_confirmed") return { ok: false, message: MESSAGES.emailNotConfirmed };
     if (error && isRateLimited(error)) return { ok: false, message: rateLimitMessage({ allowed: false, reason: "limited", retryAfterSeconds: 300 }) };
-    // Wrong password, unknown email, banned user: all look the same.
+    // Supabase or the network failing says nothing about the password: do not call it "incorrect".
+    if (error && isServiceFailure(error)) {
+      console.error("sign-in failed: Supabase Auth unavailable", error.name, error.code ?? error.status);
+      return { ok: false, message: MESSAGES.unexpected };
+    }
+    // Wrong password, unknown email, banned user: all look the same. Any other refusal also looks
+    // like that to the visitor, but its code is logged so it cannot go unnoticed.
+    if (!error?.code || !CREDENTIAL_REFUSALS.has(error.code)) {
+      console.error("sign-in refused with an unexpected code", error?.code ?? error?.status ?? "no user returned");
+    }
     return { ok: false, message: MESSAGES.invalidCredentials };
   }
 
@@ -43,7 +60,8 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
   let enabled = false;
   try {
     enabled = !data.user.is_anonymous && (await isAccountEnabled(supabase, data.user.id));
-  } catch {
+  } catch (e) {
+    console.error("sign-in failed: could not check the account", e instanceof Error ? e.message : e);
     await supabase.auth.signOut({ scope: "local" });
     return { ok: false, message: MESSAGES.unexpected };
   }

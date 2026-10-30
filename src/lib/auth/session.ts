@@ -43,7 +43,10 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
     supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
   ]);
   // A database outage must not look like "signed out" or "customer": fail closed with an error page.
-  if (profile.error || role.error) throw new Error("Could not load the account.");
+  if (profile.error || role.error) {
+    console.error("account lookup failed", profile.error?.code ?? role.error?.code, profile.error?.message ?? role.error?.message);
+    throw new Error("Could not load the account.");
+  }
 
   if (!profile.data || profile.data.disabled_at) return { status: "disabled" };
 

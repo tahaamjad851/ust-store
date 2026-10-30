@@ -30,7 +30,10 @@ export function LoginForm({ next }: { next?: string }) {
     try {
       const result = await loginAction({ ...getValues(), next });
       if (!result.ok) setFormError(applyActionResult(result, setError));
-    } catch {
+    } catch (error) {
+      // The visitor gets the generic message; the cause (network drop, aborted request, a render
+      // that threw after the redirect) must still be findable in the browser console.
+      console.error("sign-in request failed", error);
       setFormError(MESSAGES.unexpected);
     }
   });

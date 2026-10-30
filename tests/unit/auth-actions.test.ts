@@ -30,9 +30,10 @@ const auth = {
   updateUser: vi.fn(),
 };
 let profileRow: { disabled_at: string | null } | null = { disabled_at: null };
+let profileError: { code: string; message: string } | null = null;
 const supabase = {
   auth,
-  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: profileRow, error: null }) }) }) }),
+  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: profileRow, error: profileError }) }) }) }),
 };
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => supabase }));
 
@@ -45,6 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   cookieJar.clear();
   profileRow = { disabled_at: null };
+  profileError = null;
   checkRateLimits.mockResolvedValue({ allowed: true });
   auth.signInWithPassword.mockResolvedValue({ data: { user }, error: null });
   auth.signUp.mockResolvedValue({ data: { user, session: null }, error: null });
@@ -88,6 +90,39 @@ describe("loginAction", () => {
       messages.add(r.ok ? undefined : r.message);
     }
     expect([...messages]).toEqual([MESSAGES.invalidCredentials]);
+  });
+
+  it("does not call a Supabase or network failure an incorrect password, and logs the real cause", async () => {
+    const consoleError = vi.mocked(console.error);
+    for (const error of [
+      { name: "AuthRetryableFetchError", status: 0, code: undefined }, // network failure
+      { name: "AuthApiError", status: 502, code: "unexpected_failure" },
+    ]) {
+      consoleError.mockClear();
+      auth.signInWithPassword.mockResolvedValue({ data: { user: null }, error });
+      await expect(loginAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.unexpected });
+      expect(consoleError).toHaveBeenCalledWith("sign-in failed: Supabase Auth unavailable", error.name, error.code ?? error.status);
+    }
+  });
+
+  it("keeps the generic wrong-password message for an unknown refusal, but logs its code", async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { code: "validation_failed", status: 422 } });
+    await expect(loginAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.invalidCredentials });
+    expect(console.error).toHaveBeenCalledWith("sign-in refused with an unexpected code", "validation_failed");
+  });
+
+  it("does not log ordinary wrong passwords", async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { code: "invalid_credentials", status: 400 } });
+    await loginAction(input);
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("fails with the generic message, and logs why, when the account cannot be checked", async () => {
+    profileError = { code: "PGRST301", message: "JWT expired" };
+    await expect(loginAction(input)).resolves.toEqual({ ok: false, message: MESSAGES.unexpected });
+    expect(console.error).toHaveBeenCalledWith("account status lookup failed", "PGRST301", "JWT expired");
+    expect(console.error).toHaveBeenCalledWith("sign-in failed: could not check the account", "Could not check the account status.");
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it("explains an unconfirmed email (only reachable with the right password)", async () => {

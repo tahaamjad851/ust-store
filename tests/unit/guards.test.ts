@@ -49,6 +49,7 @@ async function guards() {
 
 beforeEach(() => {
   fixture = { user: { id: "u1", email: "ali@example.com" }, profile: enabledProfile, role: null };
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 describe("requireUser", () => {
