@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 
 import { getSupabasePublicEnv } from "./env";
 
-// Server client for Server Components, Server Actions and Route Handlers.
+// Server client for Server Components, Server Actions and Route Handlers (src/proxy.ts refreshes the session).
 // Acts as the signed-in user (anon key + session cookie), so RLS still applies.
 export async function createClient() {
   const { url, anonKey } = getSupabasePublicEnv();
@@ -20,7 +20,7 @@ export async function createClient() {
             cookieStore.set(name, value, options);
           }
         } catch {
-          // Server Components cannot set cookies. Safe to ignore once the session-refresh proxy is in place (Phase 1).
+          // Server Components cannot set cookies. Safe to ignore: the proxy has already refreshed the session cookies for the request.
         }
       },
     },

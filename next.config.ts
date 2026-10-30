@@ -41,6 +41,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  // forbidden() gives customers a real 403 on /admin (see src/lib/auth/session.ts).
+  experimental: { authInterrupts: true },
   turbopack: {
     rules: {
       "*.css": {
