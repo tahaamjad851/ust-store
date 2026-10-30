@@ -10,6 +10,7 @@ import {
   disableAccount,
   randomTestIp,
   signInThroughUi,
+  signInWithSession,
 } from "./helpers/dev-project";
 
 const dev = devProjectStatus();
@@ -86,7 +87,7 @@ test.describe("sign-in", () => {
 
   test("an account disabled while signed in is blocked on the next protected request", async ({ page }) => {
     const user = await createTestUser("disabled-later");
-    await signInThroughUi(page, user);
+    await signInWithSession(page, user);
     await expect(page).toHaveURL(/\/account$/);
 
     await disableAccount(user.id);
@@ -114,7 +115,7 @@ test.describe("sign-in", () => {
 
   test("signing out ends the session", async ({ page }) => {
     const user = await createTestUser("logout");
-    await signInThroughUi(page, user);
+    await signInWithSession(page, user);
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.goto("/account");
@@ -125,7 +126,7 @@ test.describe("sign-in", () => {
 test.describe("/admin", () => {
   test("a customer gets a 403 and no admin content", async ({ page }) => {
     const user = await createTestUser("customer-admin");
-    await signInThroughUi(page, user);
+    await signInWithSession(page, user);
     const response = await page.goto("/admin");
     expect(response?.status()).toBe(403);
     await expect(page.getByRole("heading", { name: "You do not have access to this page" })).toBeVisible();
@@ -134,7 +135,7 @@ test.describe("/admin", () => {
 
   test("a customer cannot open deeper admin URLs either", async ({ page }) => {
     const user = await createTestUser("customer-admin2");
-    await signInThroughUi(page, user);
+    await signInWithSession(page, user);
     const response = await page.goto("/admin/anything");
     expect([403, 404]).toContain(response?.status());
     await expect(page.getByTestId("admin-user-name")).toHaveCount(0);
@@ -142,7 +143,7 @@ test.describe("/admin", () => {
 
   test("a staff member sees the shell with their name and role", async ({ page }) => {
     const staff = await createTestUser("staff", "staff");
-    await signInThroughUi(page, staff, "/admin");
+    await signInWithSession(page, staff, "/admin");
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByTestId("admin-user-name")).toHaveText("E2E staff");
     await expect(page.getByTestId("admin-user-role")).toHaveText("Staff");
@@ -150,7 +151,7 @@ test.describe("/admin", () => {
 
   test("an admin is labelled as such", async ({ page }) => {
     const admin = await createTestUser("admin", "admin");
-    await signInThroughUi(page, admin, "/admin");
+    await signInWithSession(page, admin, "/admin");
     await expect(page.getByTestId("admin-user-role")).toHaveText("Admin");
   });
 });
@@ -190,7 +191,7 @@ test.describe("addresses", () => {
     expect(still.data?.city).toBe("Okara");
 
     // Through the website as Bob.
-    await signInThroughUi(page, bob);
+    await signInWithSession(page, bob);
     const response = await page.goto(`/account/addresses/${aliceAddressId}/edit`);
     expect(response?.status()).toBe(404);
     await page.goto("/account/addresses");
@@ -207,14 +208,14 @@ test.describe("addresses", () => {
       .insert({ full_name: "Customer", phone: "03001234567", line1: "Customer-only street", city: "Okara", province: "Punjab" });
     expect(r.error).toBeNull();
 
-    await signInThroughUi(page, staff);
+    await signInWithSession(page, staff);
     await page.goto("/account/addresses");
     await expect(page.getByText("Customer-only street")).toHaveCount(0);
   });
 
   test("a customer can add, edit, set the default and delete addresses", async ({ page }) => {
     const user = await createTestUser("journey");
-    await signInThroughUi(page, user);
+    await signInWithSession(page, user);
 
     // Profile
     await expect(page.getByLabel("Full name")).toHaveValue("E2E journey");
@@ -276,7 +277,7 @@ test.describe("addresses", () => {
   // re-validates is covered by tests/unit/account-actions.test.ts.
   test("the address form says what to fix before anything is saved", async ({ page }) => {
     const user = await createTestUser("invalid-address");
-    await signInThroughUi(page, user);
+    await signInWithSession(page, user);
     await page.goto("/account/addresses/new");
     await page.waitForLoadState("networkidle");
     // The receiver's name starts out as the account's name; empty it so that it is missing too.
