@@ -3,7 +3,7 @@
 // afterwards. They refuse to run unless DB_TEST_PROJECT_REF names the project the app points at,
 // the same guard as `npm run test:db`.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { randomBytes, randomInt } from "node:crypto";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -75,12 +75,29 @@ export async function clientFor(user: TestUser): Promise<SupabaseClient> {
 /** A random address in 203.0.113.0/24 (documentation range): gives each test file its own rate-limit bucket. */
 export const randomTestIp = () => `203.0.113.${randomInt(1, 255)}`;
 
-/** Signs in through the real login form and waits for the redirect. */
+/**
+ * Signs in through the real login form and waits for the redirect.
+ *
+ * Signing in is several round trips to the hosted DEV project (rate limits, password check, profile,
+ * then the first render of the target page), so it is awaited as a navigation, not as an assertion
+ * with the 5 s expect timeout. A refusal shows up as an alert on the form; fail at once with its text
+ * instead of waiting for the test to time out.
+ */
 export async function signInThroughUi(page: Page, user: TestUser, next?: string) {
   await page.goto(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
   await page.waitForLoadState("networkidle");
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);
+
+  const refusal = page.getByRole("alert").filter({ hasText: /\S/ });
+  const left = page.waitForURL((url) => !url.pathname.startsWith("/login"));
+  const refused = refusal.waitFor().then(async () => {
+    throw new Error(`Sign-in for ${user.email} was refused: ${await refusal.first().innerText()}`);
+  });
+  // Whichever loses must not become an unhandled rejection when the page closes.
+  left.catch(() => {});
+  refused.catch(() => {});
+
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await Promise.race([left, refused]);
 }

@@ -25,6 +25,10 @@ test.afterAll(async () => {
 const alertWith = (page: import("@playwright/test").Page, text: string) =>
   page.getByRole("alert").filter({ hasText: text });
 
+// The badge only. A plain getByText("Default") is a case-insensitive substring match, so it also finds
+// the "Make default" button on every address that is not the default.
+const defaultBadge = (card: import("@playwright/test").Locator) => card.getByText("Default", { exact: true });
+
 test.describe("sign-in", () => {
   test("a wrong password shows the generic error, and an unknown email shows the very same one", async ({ page }) => {
     const user = await createTestUser("wrongpw");
@@ -233,7 +237,7 @@ test.describe("addresses", () => {
     await page.getByRole("button", { name: "Add address" }).click();
     await expect(page).toHaveURL(/\/account\/addresses$/);
     const farm = page.getByRole("listitem").filter({ hasText: "Chak 12/4L" });
-    await expect(farm.getByText("Default")).toBeVisible();
+    await expect(defaultBadge(farm)).toBeVisible();
 
     // Second address marked as default takes over.
     await page.getByRole("link", { name: "Add address" }).click();
@@ -246,13 +250,13 @@ test.describe("addresses", () => {
     await page.getByLabel("Use this as my default delivery address").click();
     await page.getByRole("button", { name: "Add address" }).click();
     const workshop = page.getByRole("listitem").filter({ hasText: "Shop 4, Main Bazaar" });
-    await expect(workshop.getByText("Default")).toBeVisible();
-    await expect(farm.getByText("Default")).toHaveCount(0);
+    await expect(defaultBadge(workshop)).toBeVisible();
+    await expect(defaultBadge(farm)).toHaveCount(0);
 
     // Make the first one the default again.
     await farm.getByRole("button", { name: /Make default/ }).click();
-    await expect(farm.getByText("Default")).toBeVisible();
-    await expect(workshop.getByText("Default")).toHaveCount(0);
+    await expect(defaultBadge(farm)).toBeVisible();
+    await expect(defaultBadge(workshop)).toHaveCount(0);
 
     // Edit
     await farm.getByRole("link", { name: /Edit/ }).click();
@@ -265,14 +269,18 @@ test.describe("addresses", () => {
     await farm.getByRole("button", { name: /Delete/ }).click();
     await farm.getByRole("button", { name: "Yes, delete" }).click();
     await expect(page.getByText("Chak 12/4L")).toHaveCount(0);
-    await expect(workshop.getByText("Default")).toBeVisible();
+    await expect(defaultBadge(workshop)).toBeVisible();
   });
 
-  test("the address form checks its input on the server too", async ({ page }) => {
+  // This is the form's own check (the same Zod schema, run in the browser). That the server action
+  // re-validates is covered by tests/unit/account-actions.test.ts.
+  test("the address form says what to fix before anything is saved", async ({ page }) => {
     const user = await createTestUser("invalid-address");
     await signInThroughUi(page, user);
     await page.goto("/account/addresses/new");
     await page.waitForLoadState("networkidle");
+    // The receiver's name starts out as the account's name; empty it so that it is missing too.
+    await page.getByLabel("Receiver's name").fill("");
     await page.getByRole("button", { name: "Add address" }).click();
     await expect(page.getByText("Enter the receiver's name")).toBeVisible();
     await expect(page.getByText("Enter a Pakistani mobile number, e.g. 0300 1234567")).toBeVisible();
