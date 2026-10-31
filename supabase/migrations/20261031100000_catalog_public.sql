@@ -62,7 +62,7 @@ grant execute on function public.stock_availability(uuid[]) to anon, authenticat
 --   p_in_stock     only products whose display variant is available
 --   p_min/max      price range in paisa on the display variant's price
 --   p_sort         relevance | price-asc | price-desc | name | newest (anything else = relevance)
---   p_limit        1..48 (default 12), p_offset 0..100000
+--   p_limit        1..48 (default 12), p_offset 0..10000
 --
 -- total_count is the number of matches, repeated on every row. An offset past the end returns no
 -- rows (and so no total); the caller asks again for the first page.
@@ -82,12 +82,14 @@ language sql
 stable
 security definer
 set search_path = ''
+-- anon can call this directly, so one call may never run long.
+set statement_timeout = '3s'
 as $$
   with recursive
   params as (
     select left(lower(btrim(regexp_replace(coalesce(p_query, ''), '\s+', ' ', 'g'))), 100) as q,
            least(greatest(coalesce(p_limit, 12), 1), 48) as lim,
-           least(greatest(coalesce(p_offset, 0), 0), 100000) as off,
+           least(greatest(coalesce(p_offset, 0), 0), 10000) as off,
            case when p_sort in ('price-asc', 'price-desc', 'name', 'newest') then p_sort else 'relevance' end as sort
   ),
   -- LIKE wildcards in what the visitor typed are escaped, so "50%" or "a_b" are plain text.
@@ -197,15 +199,22 @@ begin
   -- anon may execute only the functions the storefront needs (same list as the hardening migration,
   -- plus catalog_search).
   for f in
-    select p.oid::regprocedure as sig
+    select p.oid::regprocedure as sig, r.rolname
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
+      cross join (values ('anon'), ('authenticated')) as r (rolname)
      where n.nspname = 'public'
        and p.prorettype <> 'trigger'::regtype
-       and has_function_privilege('anon', p.oid, 'execute')
-       and p.proname <> all (array['is_admin', 'is_full_admin', 'try_uuid', 'effective_price_paisa', 'stock_availability', 'catalog_search'])
+       and has_function_privilege(r.rolname, p.oid, 'execute')
+       and p.proname <> all (
+         case when r.rolname = 'anon'
+           then array['is_admin', 'is_full_admin', 'try_uuid', 'effective_price_paisa', 'stock_availability', 'catalog_search']
+           else array['is_admin', 'is_full_admin', 'try_uuid', 'effective_price_paisa', 'stock_availability', 'catalog_search',
+                      'place_order', 'adjust_stock', 'set_stock_thresholds', 'set_order_status', 'set_payment_status',
+                      'request_return', 'get_order_by_tracking_token', 'get_bank_transfer_details', 'submit_bank_transfer_reference']
+         end)
   loop
-    raise exception 'anon can execute %, which is not in the allowlist', f.sig;
+    raise exception '% can execute %, which is not in the allowlist', f.rolname, f.sig;
   end loop;
 
   -- The stock function must not hand out counts.
