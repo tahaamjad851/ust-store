@@ -2,25 +2,13 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ProductListing, ProductListingSkeleton } from "@/components/products/product-listing";
-import {
-  getCategoryTree,
-  getFitments,
-  getFitmentLabels,
-  getProducts,
-  getTractorModels,
-} from "@/services/catalog";
+import { getCategoryTree } from "@/services/catalog";
 
 export const metadata: Metadata = { title: "Shop all products" };
 
 /** All products. Target of the header search (?q=) and the tractor selector (?model=). */
 export default async function ShopPage({ searchParams }: PageProps<"/shop">) {
-  const [tree, products, models, fitments, fitmentLabels] = await Promise.all([
-    getCategoryTree(),
-    getProducts(),
-    getTractorModels(),
-    getFitments(),
-    getFitmentLabels(),
-  ]);
+  const tree = await getCategoryTree();
 
   return (
     <div className="mx-auto max-w-page space-y-6 px-margin py-6 lg:px-margin-desktop">
@@ -29,10 +17,6 @@ export default async function ShopPage({ searchParams }: PageProps<"/shop">) {
       <Suspense fallback={<ProductListingSkeleton />}>
         <ProductListing
           basePath="/shop"
-          products={products}
-          models={models}
-          fitments={fitments}
-          fitmentLabels={fitmentLabels}
           searchParams={searchParams}
           groups={{
             title: "Categories",

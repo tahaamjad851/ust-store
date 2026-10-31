@@ -1,59 +1,101 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Lock, MessageCircle, ShoppingCart, Trash2, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProductImageView } from "@/components/products/product-image";
 import { StockIndicator } from "@/components/products/stock-indicator";
 import { whatsappHref } from "@/lib/contact";
 import { formatPKR } from "@/lib/pricing";
-import type { CartCatalogItem } from "@/services/catalog";
 import { MAX_LINE_QTY, useCart } from "./cart-provider";
 import { QuantityStepper } from "./quantity-stepper";
 import { usePricedLines } from "./use-priced-lines";
 
 export function CartView({
-  catalog,
   freeDeliveryThresholdPaisa,
+  deliveryNote,
   whatsappNumber,
   aside,
 }: {
-  catalog: CartCatalogItem[];
   freeDeliveryThresholdPaisa: number | null;
+  /** From store settings: what is said about the delivery charge instead of a number. */
+  deliveryNote: string;
   whatsappNumber: string;
   /** Server-rendered service points shown under the summary. */
   aside?: React.ReactNode;
 }) {
-  const { hydrated, setQuantity, remove, clear } = useCart();
-  const { priced, totals } = usePricedLines(catalog, freeDeliveryThresholdPaisa);
+  const { hydrated, setQuantity, remove, clear, notice, clearNotice } = useCart();
+  const { priced, totals, sellableCount, status, retry } = usePricedLines(freeDeliveryThresholdPaisa);
 
-  if (!hydrated) {
-    return <p className="py-16 text-center text-body-lg text-muted-foreground">Loading your cart…</p>;
+  if (!hydrated || (status === "loading" && priced.length === 0)) {
+    return (
+      <p role="status" className="py-16 text-center text-body-lg text-muted-foreground">
+        Loading your cart…
+      </p>
+    );
   }
 
-  if (priced.length === 0) {
+  if (status === "error" && priced.length === 0) {
     return (
-      <div className="mx-auto max-w-md rounded-lg border border-border bg-card p-8 text-center">
-        <ShoppingCart className="mx-auto size-10 text-muted-foreground" aria-hidden="true" />
-        <h2 className="mt-3 text-headline-md">Your cart is empty</h2>
-        <p className="mt-1 text-body-md text-muted-foreground">Browse parts by category or search by part name.</p>
-        <Button asChild className="mt-4 h-11">
-          <Link href="/shop">Start shopping</Link>
+      <div role="alert" className="mx-auto max-w-md rounded-lg border border-border bg-card p-8 text-center">
+        <h2 className="text-headline-md">We couldn&apos;t load your cart</h2>
+        <p className="mt-1 text-body-md text-muted-foreground">Your items are saved on this device. Check your connection and try again.</p>
+        <Button type="button" className="mt-4 h-11" onClick={retry}>
+          Try again
         </Button>
       </div>
     );
   }
 
-  const itemCount = priced.reduce((n, l) => n + l.quantity, 0);
+  if (priced.length === 0) {
+    return (
+      <div className="mx-auto max-w-md space-y-3">
+        {notice && (
+          <p role="status" className="rounded-lg bg-warning-container p-3 text-body-sm text-warning-foreground">
+            {notice}
+          </p>
+        )}
+        <div className="rounded-lg border border-border bg-card p-8 text-center">
+          <ShoppingCart className="mx-auto size-10 text-muted-foreground" aria-hidden="true" />
+          <h2 className="mt-3 text-headline-md">Your cart is empty</h2>
+          <p className="mt-1 text-body-md text-muted-foreground">Browse parts by category or search by part name.</p>
+          <Button asChild className="mt-4 h-11">
+            <Link href="/shop">Start shopping</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const itemCount = sellableCount;
   const waText =
     "Hello, I'd like to order:\n" +
-    priced.map((l) => `- ${l.quantity} x ${l.product.name} (SKU ${l.product.sku})`).join("\n");
+    priced
+      .filter((l) => l.product.stock_status !== "out_of_stock")
+      .map((l) => `- ${l.quantity} x ${l.product.name}${l.product.variant_name ? `, ${l.product.variant_name}` : ""} (SKU ${l.product.sku})`)
+      .join("\n");
   const threshold = freeDeliveryThresholdPaisa;
   const progress = threshold ? Math.min(100, Math.round((totals.subtotal_paisa / threshold) * 100)) : 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
       <div className="space-y-4">
+        {notice && (
+          <p role="status" className="flex items-start justify-between gap-3 rounded-lg bg-warning-container p-3 text-body-sm text-warning-foreground">
+            {notice}
+            <button type="button" onClick={clearNotice} className="min-h-11 shrink-0 underline">
+              Dismiss
+            </button>
+          </p>
+        )}
+        {status === "error" && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-body-sm">
+            <span>We couldn&apos;t refresh your cart just now, so some lines may be missing.</span>
+            <Button type="button" variant="outline" className="h-11 border-input" onClick={retry}>
+              Try again
+            </Button>
+          </div>
+        )}
         {threshold !== null && (
           <section aria-label="Free delivery" className="rounded-lg border border-border bg-card p-4">
             <p className="flex items-center gap-2 text-label-lg">
@@ -88,22 +130,27 @@ export function CartView({
           </div>
           <ul className="divide-y divide-border">
             {priced.map(({ product, quantity, unit_price_paisa: price, line_total_paisa: lineTotal }) => {
+              const unavailable = product.stock_status === "out_of_stock";
               return (
-                <li key={product.id} className="grid grid-cols-[72px_1fr] gap-3 p-4 md:grid-cols-[1fr_110px_140px_110px] md:items-center md:gap-4">
+                <li key={product.variant_id} className="grid grid-cols-[72px_1fr] gap-3 p-4 md:grid-cols-[1fr_110px_140px_110px] md:items-center md:gap-4">
                   <div className="contents md:flex md:gap-3">
-                    <Image
-                      src={product.image_paths[0]}
-                      alt={`${product.name} (placeholder image)`}
+                    <ProductImageView
+                      image={product.image}
                       width={72}
                       height={72}
+                      sizes="72px"
                       className="size-18 rounded-lg border border-border bg-surface-low"
                     />
                     <div className="min-w-0 space-y-1">
                       <Link href={`/products/${product.slug}`} className="line-clamp-2 text-label-lg hover:underline">
                         {product.name}
+                        {product.variant_name && <span className="font-normal text-muted-foreground">, {product.variant_name}</span>}
                       </Link>
                       <p className="font-mono text-label-sm text-muted-foreground">SKU: {product.sku}</p>
-                      <StockIndicator product={product} />
+                      <StockIndicator status={product.stock_status} />
+                      {unavailable && (
+                        <p className="text-body-sm text-destructive">Not included in your total.</p>
+                      )}
                       <p className="text-body-sm tabular md:hidden">{formatPKR(price)} each</p>
                     </div>
                   </div>
@@ -111,17 +158,22 @@ export function CartView({
                   <div className="col-span-2 flex items-center justify-between gap-3 md:col-span-1 md:justify-center">
                     <QuantityStepper
                       value={quantity}
-                      onChange={(n) => setQuantity(product.id, product.name, n)}
-                      max={Math.max(1, Math.min(MAX_LINE_QTY, product.stock_qty))}
+                      onChange={(n) => setQuantity(product.variant_id, product.name, n)}
+                      max={MAX_LINE_QTY}
+                      disabled={unavailable}
                       label={`Quantity for ${product.name}`}
                     />
-                    <p className="text-price-md tabular md:hidden">{formatPKR(lineTotal)}</p>
+                    <p className="text-price-md tabular md:hidden">
+                      {unavailable ? <span className="text-body-sm text-muted-foreground">Not included</span> : formatPKR(lineTotal)}
+                    </p>
                   </div>
-                  <p className="hidden text-right text-price-md tabular md:block">{formatPKR(lineTotal)}</p>
+                  <p className="hidden text-right text-price-md tabular md:block">
+                    {unavailable ? <span className="text-body-sm text-muted-foreground">Not included</span> : formatPKR(lineTotal)}
+                  </p>
                   <div className="col-span-2 md:col-span-4">
                     <button
                       type="button"
-                      onClick={() => remove(product.id, product.name)}
+                      onClick={() => remove(product.variant_id, product.name)}
                       className="inline-flex min-h-11 items-center gap-1 text-label-md text-destructive hover:underline"
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -157,28 +209,41 @@ export function CartView({
             </div>
             <div className="flex justify-between">
               <dt>Delivery</dt>
-              <dd className="font-semibold">{totals.free_delivery ? "Free" : "Calculated at checkout"}</dd>
+              <dd className="max-w-48 text-right font-semibold">{deliveryNote}</dd>
             </div>
             <div className="flex items-baseline justify-between border-t border-border pt-3">
               <dt className="text-headline-sm">Total</dt>
               <dd className="text-price-lg text-primary tabular">{formatPKR(totals.subtotal_paisa)}</dd>
             </div>
           </dl>
-          <p className="mt-1 text-body-sm text-muted-foreground">Delivery charges, if any, are confirmed at checkout.</p>
           <div className="mt-4 space-y-3">
-            <Button asChild className="h-12 w-full">
-              <Link href="/checkout">
-                <Lock />
-                Proceed to checkout
-              </Link>
-            </Button>
-            <Button asChild className="h-12 w-full bg-whatsapp hover:bg-whatsapp-hover">
-              <a href={whatsappHref(whatsappNumber, waText)} target="_blank" rel="noopener noreferrer">
-                <MessageCircle />
-                Order on WhatsApp
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
-            </Button>
+            {sellableCount > 0 ? (
+              <Button asChild className="h-12 w-full">
+                <Link href="/checkout">
+                  <Lock />
+                  Proceed to checkout
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <p id="checkout-blocked" role="status" className="text-body-sm text-muted-foreground">
+                  Everything in your cart is out of stock right now. Remove it or check back later.
+                </p>
+                <Button disabled aria-describedby="checkout-blocked" className="h-12 w-full">
+                  <Lock />
+                  Proceed to checkout
+                </Button>
+              </>
+            )}
+            {sellableCount > 0 && (
+              <Button asChild className="h-12 w-full bg-whatsapp hover:bg-whatsapp-hover">
+                <a href={whatsappHref(whatsappNumber, waText)} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle />
+                  Order on WhatsApp
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </Button>
+            )}
           </div>
         </section>
         {aside}

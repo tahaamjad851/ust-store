@@ -10,32 +10,26 @@ import { Button } from "@/components/ui/button";
 import { whatsappHref } from "@/lib/contact";
 import {
   getCategoryTree,
-  getFitmentLabels,
-  getProducts,
+  getFeaturedProducts,
   getStoreSettings,
   getTractorModels,
+  type ProductCards,
 } from "@/services/catalog";
 
 const container = "mx-auto max-w-page px-margin lg:px-margin-desktop";
 
 export default async function HomePage() {
-  const [settings, tree, products, models, fitment] = await Promise.all([
-    getStoreSettings(),
-    getCategoryTree(),
-    getProducts(),
-    getTractorModels(),
-    getFitmentLabels(),
-  ]);
+  const [settings, tree, models] = await Promise.all([getStoreSettings(), getCategoryTree(), getTractorModels()]);
 
   const tractorParts = tree.find((c) => c.slug === "tractor-parts");
-  const partIds = new Set([tractorParts?.id, ...(tractorParts?.children.map((c) => c.id) ?? [])]);
-  const featured = products.filter((p) => partIds.has(p.category_id)).slice(0, 5);
-  const fluidCategoryIds = new Set(
-    tree
-      .filter((c) => ["engine-oils", "lubricants", "hydraulic-oils"].includes(c.slug))
-      .flatMap((c) => [c.id, ...c.children.map((s) => s.id)]),
-  );
-  const fluids = products.filter((p) => fluidCategoryIds.has(p.category_id)).slice(0, 4);
+  const fluidCategories = tree.filter((c) => ["engine-oils", "lubricants", "hydraulic-oils"].includes(c.slug));
+  const [partCards, fluidCards] = await Promise.all([
+    tractorParts ? getFeaturedProducts(tractorParts.id, 5) : Promise.resolve<ProductCards>({ items: [], fitmentLabels: {} }),
+    Promise.all(fluidCategories.map((c) => getFeaturedProducts(c.id, 4))),
+  ]);
+  const featured = partCards.items;
+  const fitment = partCards.fitmentLabels;
+  const fluids = [...new Map(fluidCards.flatMap((c) => c.items).map((p) => [p.id, p])).values()].slice(0, 4);
   const wa = whatsappHref(settings.whatsapp_number);
 
   return (

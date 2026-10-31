@@ -1,7 +1,7 @@
-import Image from "next/image";
+import { ProductImageView } from "./product-image";
 import Link from "next/link";
 import { AddToCartButton } from "@/components/cart/add-to-cart-button";
-import { stockStatus } from "@/features/inventory/stock";
+import { isPurchasable } from "@/features/inventory/stock";
 import { discount } from "@/lib/pricing";
 import type { Product } from "@/types/catalog";
 import { Price } from "./price";
@@ -11,11 +11,10 @@ export function ProductCard({ product, fitmentLabel }: { product: Product; fitme
   const saving = discount(product);
   const href = `/products/${product.slug}`;
   return (
-    <article className="flex flex-col rounded-lg border border-border bg-card shadow-card transition-shadow hover:border-primary hover:shadow-card-hover">
+    <article className="flex w-full flex-col rounded-lg border border-border bg-card shadow-card transition-shadow hover:border-primary hover:shadow-card-hover">
       <div className="relative">
-        <Image
-          src={product.image_paths[0]}
-          alt={`${product.name} (placeholder image)`}
+        <ProductImageView
+          image={product.image}
           width={600}
           height={600}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
@@ -54,12 +53,12 @@ export function ProductCard({ product, fitmentLabel }: { product: Product; fitme
           </dl>
         )}
         <div className="mt-auto space-y-2 pt-1">
-          <StockIndicator product={product} />
+          <StockIndicator status={product.stock_status} />
           <Price product={product} />
           <AddToCartButton
-            productId={product.id}
+            variantId={product.variant_id}
             productName={product.name}
-            disabled={stockStatus(product) === "out_of_stock"}
+            disabled={!isPurchasable(product.stock_status)}
           />
         </div>
       </div>

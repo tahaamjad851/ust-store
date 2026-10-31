@@ -1,6 +1,6 @@
-import { STOCK_LABEL, stockStatus } from "@/features/inventory/stock";
+import { STOCK_LABEL } from "@/features/inventory/stock";
 import { cn } from "@/lib/utils";
-import type { Product } from "@/types/catalog";
+import type { StockStatus } from "@/types/catalog";
 
 const DOT = {
   in_stock: "bg-primary",
@@ -8,14 +8,7 @@ const DOT = {
   out_of_stock: "bg-destructive",
 } as const;
 
-export function StockIndicator({
-  product,
-  className,
-}: {
-  product: Pick<Product, "stock_qty" | "low_stock_threshold">;
-  className?: string;
-}) {
-  const status = stockStatus(product);
+export function StockIndicator({ status, className }: { status: StockStatus; className?: string }) {
   return (
     <p className={cn("inline-flex items-center gap-1.5 text-label-md", className)}>
       <span className={cn("size-2 rounded-full", DOT[status])} aria-hidden="true" />

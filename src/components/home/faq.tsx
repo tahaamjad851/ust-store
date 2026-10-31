@@ -12,20 +12,20 @@ export function Faq({ settings }: { settings: StoreSettings }) {
     },
     {
       q: "How is my order delivered?",
-      a: `We deliver across Pakistan by ${settings.delivery_methods.map((m) => m.name.toLowerCase()).join(" or ")}.${
+      a: `We deliver across Pakistan by ${settings.delivery_methods.map((m) => m.name.toLowerCase()).join(" or ")}. ${settings.delivery_charge_note.replace(/\.+$/, "")}.${
         settings.free_delivery_threshold_paisa !== null
           ? ` Delivery is free on orders over ${formatPKR(settings.free_delivery_threshold_paisa)}.`
           : ""
       }`,
     },
     cod && { q: "Can I pay cash on delivery?", a: cod.description },
-    settings.return_period_days !== null && {
-      q: "Can I return a part that doesn't fit?",
-      a: `Returns are accepted within ${settings.return_period_days} days. Contact us first so we can confirm the return.`,
+    settings.return_policy_note && {
+      q: "Can I exchange a part that doesn't fit?",
+      a: settings.return_policy_note,
     },
     {
       q: "Do you sell in bulk to workshops and dealers?",
-      a: "Yes. Ask us on WhatsApp for wholesale pricing on larger orders.",
+      a: "Yes. Ask us on WhatsApp for a quote on larger orders.",
     },
   ].filter((i): i is { q: string; a: string } => Boolean(i));
 

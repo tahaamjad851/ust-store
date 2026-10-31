@@ -9,16 +9,14 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 import { whatsappHref } from "@/lib/contact";
-import { USING_DEMO_DATA } from "@/lib/mock";
-import { getActiveProductIds, getCategoryTree, getStoreSettings, getTractorModels } from "@/services/catalog";
+import { getCategoryTree, getStoreSettings, getTractorModels } from "@/services/catalog";
+
+// The dev catalogue is the DEMO seed. The notice stays until DEMO_CATALOG_NOTICE=off is set, which is part
+// of removing the demo data before launch (docs/ROADMAP.md, launch checklist).
+const showDemoNotice = process.env.DEMO_CATALOG_NOTICE !== "off";
 
 export async function StoreShell({ children }: { children: React.ReactNode }) {
-  const [settings, tree, productIds, models] = await Promise.all([
-    getStoreSettings(),
-    getCategoryTree(),
-    getActiveProductIds(),
-    getTractorModels(),
-  ]);
+  const [settings, tree, models] = await Promise.all([getStoreSettings(), getCategoryTree(), getTractorModels()]);
 
   // Categories with several subcategories get a desktop mega-menu (desktop homepage design).
   const navItems: NavItem[] = [
@@ -56,7 +54,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <CartProvider knownProductIds={productIds}>
+    <CartProvider>
       <CategoryDrawerProvider
         categories={drawerCategories}
         whatsappHref={whatsappHref(settings.whatsapp_number)}
@@ -68,7 +66,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
         >
           Skip to content
         </a>
-        {USING_DEMO_DATA && (
+        {showDemoNotice && (
           <p className="bg-warning-container px-margin py-1 text-center text-label-sm text-warning-foreground">
             Demo catalogue: products, prices and stock shown are examples only.
           </p>

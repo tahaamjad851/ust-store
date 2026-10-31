@@ -24,12 +24,12 @@ export function TrustStrip({ settings, className }: { settings: StoreSettings; c
       title: "Help finding parts",
       text: "Ask us on WhatsApp",
     },
-    settings.return_period_days !== null && {
+    settings.return_policy_note && {
       icon: RotateCcw,
-      title: `${settings.return_period_days}-day returns`,
-      text: "See return terms",
+      title: "Exchange policy",
+      text: settings.return_policy_note,
     },
-  ].filter((i): i is Exclude<typeof i, false> => Boolean(i));
+  ].filter((i): i is Exclude<typeof i, false | ""> => Boolean(i));
 
   return (
     <ul className={cn("grid grid-cols-2 gap-3 lg:grid-cols-4", className)}>

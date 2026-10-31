@@ -2,20 +2,19 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { filterProducts, paginate, parseListingParams, SORT_OPTIONS, type ListingParams } from "@/features/catalog/listing";
+import { parseListingParams, SORT_OPTIONS, type ListingParams } from "@/features/catalog/listing";
 import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import type { Category, Product, ProductFitment, TractorModel } from "@/types/catalog";
+import { getProductPage, getTractorModels } from "@/services/catalog";
+import type { Category } from "@/types/catalog";
 import { FiltersPanel } from "./filters-panel";
 import { ProductCard } from "./product-card";
 import { SortSelect } from "./sort-select";
 
 type Props = {
   basePath: string;
-  products: Product[];
-  models: TractorModel[];
-  fitments: ProductFitment[];
-  fitmentLabels: Record<string, string>;
+  /** Category whose products (and its subcategories' products) are listed; null = the whole shop. */
+  categoryId?: string | null;
   groups?: { title: string; items: (Pick<Category, "id" | "name"> & { href: string; current: boolean })[] };
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -36,10 +35,13 @@ function hrefWith(basePath: string, params: ListingParams, overrides: Partial<Re
   return s ? `${basePath}?${s}` : basePath;
 }
 
-export async function ProductListing({ basePath, products, models, fitments, fitmentLabels, groups, searchParams }: Props) {
+export async function ProductListing({ basePath, categoryId = null, groups, searchParams }: Props) {
   const params = parseListingParams(await searchParams);
-  const filtered = filterProducts([...products], params, fitments);
-  const { items, page, pageCount, total } = paginate(filtered, params.page);
+  // Searching, filtering, sorting and paging all happen in the database.
+  const [{ items, page, pageCount, total, fitmentLabels }, models] = await Promise.all([
+    getProductPage(params, categoryId),
+    getTractorModels(),
+  ]);
   const model = models.find((m) => m.id === params.model);
   const makes = [...new Set(models.map((m) => m.make))];
 

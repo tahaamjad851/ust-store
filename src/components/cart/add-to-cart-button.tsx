@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 import { useCart } from "./cart-provider";
 
 export function AddToCartButton({
-  productId,
+  variantId,
   productName,
   quantity = 1,
   disabled = false,
   className,
 }: {
-  productId: string;
+  variantId: string;
   productName: string;
   quantity?: number;
   disabled?: boolean;
@@ -23,7 +23,7 @@ export function AddToCartButton({
     <Button
       type="button"
       disabled={disabled}
-      onClick={() => add(productId, productName, quantity)}
+      onClick={() => add(variantId, productName, quantity)}
       className={cn("h-11 w-full", className)}
       aria-label={disabled ? `${productName} is out of stock` : `Add ${productName} to cart`}
     >

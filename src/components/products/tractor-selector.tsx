@@ -79,7 +79,7 @@ export function TractorSelector({
           <option value="">{make ? "Select model" : "Choose a make first"}</option>
           {makeModels.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.model} ({m.year_from}–{m.year_to ?? "present"})
+              {m.model}{m.year_from !== null && ` (${m.year_from}–${m.year_to ?? "present"})`}
             </option>
           ))}
         </select>

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm, type FieldError } from "react-hook-form";
@@ -8,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Info, Lock, MessageCircle, ShoppingCart } from "lucide-react";
 import { useCart } from "@/components/cart/cart-provider";
 import { usePricedLines } from "@/components/cart/use-priced-lines";
+import { ProductImageView } from "@/components/products/product-image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -18,12 +18,13 @@ import { whatsappHref } from "@/lib/contact";
 import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { ADDRESS_TYPES, checkoutSchema, PROVINCES, type CheckoutInput } from "@/lib/validation/checkout";
-import type { CartCatalogItem } from "@/services/catalog";
 import type { StoreSettings } from "@/types/store";
 
 type Props = {
-  catalog: CartCatalogItem[];
-  settings: Pick<StoreSettings, "delivery_methods" | "payment_methods" | "free_delivery_threshold_paisa" | "whatsapp_number" | "phone_primary">;
+  settings: Pick<
+    StoreSettings,
+    "delivery_methods" | "payment_methods" | "free_delivery_threshold_paisa" | "delivery_charge_note" | "whatsapp_number" | "phone_primary"
+  >;
 };
 
 const fieldInput = "h-11 rounded-lg border-input bg-card text-body-lg md:text-body-md";
@@ -58,9 +59,9 @@ function Section({ step, title, description, children }: { step: number; title: 
   );
 }
 
-export function CheckoutForm({ catalog, settings }: Props) {
+export function CheckoutForm({ settings }: Props) {
   const { hydrated } = useCart();
-  const { priced, totals } = usePricedLines(catalog, settings.free_delivery_threshold_paisa);
+  const { priced, totals, sellableCount, status, retry } = usePricedLines(settings.free_delivery_threshold_paisa);
   const [submitted, setSubmitted] = useState(false);
   const paymentMethods = settings.payment_methods.filter((m) => m.enabled);
 
@@ -93,8 +94,24 @@ export function CheckoutForm({ catalog, settings }: Props) {
   // DEMO: orders are not connected yet. Validate only; nothing leaves the browser.
   const onSubmit = handleSubmit(() => setSubmitted(true));
 
-  if (!hydrated) {
-    return <p className="py-16 text-center text-body-lg text-muted-foreground">Loading your order…</p>;
+  if (!hydrated || (status === "loading" && priced.length === 0)) {
+    return (
+      <p role="status" className="py-16 text-center text-body-lg text-muted-foreground">
+        Loading your order…
+      </p>
+    );
+  }
+
+  if (status === "error" && priced.length === 0) {
+    return (
+      <div role="alert" className="mx-auto max-w-md rounded-lg border border-border bg-card p-8 text-center">
+        <h2 className="text-headline-md">We couldn&apos;t load your order</h2>
+        <p className="mt-1 text-body-md text-muted-foreground">Your cart is saved on this device. Check your connection and try again.</p>
+        <Button type="button" className="mt-4 h-11" onClick={retry}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   if (priced.length === 0) {
@@ -291,7 +308,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
                 onValueChange={field.onChange}
                 aria-label="Delivery method"
                 aria-invalid={!!errors.delivery_method_id}
-                aria-describedby={describedBy("delivery_method_id")}
+                aria-describedby={[describedBy("delivery_method_id"), "delivery-note"].filter(Boolean).join(" ")}
                 className="gap-2"
               >
                 {settings.delivery_methods.map((m) => (
@@ -305,14 +322,14 @@ export function CheckoutForm({ catalog, settings }: Props) {
                       <span className="block text-label-lg">{m.name}</span>
                       <span className="block text-body-sm text-muted-foreground">{m.description}</span>
                     </span>
-                    <span className="text-label-md tabular">
-                      {totals.free_delivery ? "Free" : m.fee_paisa === null ? "Fee confirmed later" : formatPKR(m.fee_paisa)}
-                    </span>
                   </Label>
                 ))}
               </RadioGroup>
             )}
           />
+          <p id="delivery-note" className="text-body-sm text-muted-foreground">
+            {settings.delivery_charge_note}
+          </p>
           <FieldErrorText id="delivery_method_id-error" error={errors.delivery_method_id} />
         </Section>
 
@@ -391,19 +408,31 @@ export function CheckoutForm({ catalog, settings }: Props) {
           </h2>
           <ul className="mt-4 divide-y divide-border">
             {priced.map(({ product, quantity, line_total_paisa }) => (
-              <li key={product.id} className="flex gap-3 py-3">
-                <Image
-                  src={product.image_paths[0]}
-                  alt={`${product.name} (placeholder image)`}
+              <li key={product.variant_id} className="flex gap-3 py-3">
+                <ProductImageView
+                  image={product.image}
                   width={56}
                   height={56}
+                  sizes="56px"
                   className="size-14 rounded-lg border border-border bg-surface-low"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-label-md">{product.name}</p>
-                  <p className="text-body-sm text-muted-foreground">Qty: {quantity}</p>
+                  <p className="line-clamp-2 text-label-md">
+                    {product.name}
+                    {product.variant_name && `, ${product.variant_name}`}
+                  </p>
+                  <p className="text-body-sm text-muted-foreground">
+                    Qty: {quantity}
+                    {product.stock_status === "out_of_stock" && " · Out of stock, not included"}
+                  </p>
                 </div>
-                <p className="text-label-lg tabular">{formatPKR(line_total_paisa)}</p>
+                <p className="text-label-lg tabular">
+                  {product.stock_status === "out_of_stock" ? (
+                    <span className="text-body-sm text-muted-foreground">Not included</span>
+                  ) : (
+                    formatPKR(line_total_paisa)
+                  )}
+                </p>
               </li>
             ))}
           </ul>
@@ -414,7 +443,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
             </div>
             <div className="flex justify-between">
               <dt>Delivery</dt>
-              <dd>{totals.free_delivery ? "Free" : "Confirmed after order"}</dd>
+              <dd className="max-w-48 text-right">{settings.delivery_charge_note}</dd>
             </div>
             <div className="flex items-baseline justify-between border-t border-border pt-3">
               <dt className="text-headline-sm">Total</dt>
@@ -431,7 +460,7 @@ export function CheckoutForm({ catalog, settings }: Props) {
             )}
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="mt-4 h-12 w-full text-label-lg">
+          <Button type="submit" disabled={isSubmitting || sellableCount === 0} className="mt-4 h-12 w-full text-label-lg">
             <Lock />
             Place order ({formatPKR(totals.subtotal_paisa)})
           </Button>

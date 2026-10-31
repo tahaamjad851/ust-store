@@ -1,16 +1,19 @@
 "use client";
 
-// DEMO cart: product ids and quantities only, kept in this browser's localStorage.
-// Prices are never stored here; they always come from the server catalog.
-// Replace with a server-side cart once orders are built.
+// The cart lives in this browser's localStorage and holds variant ids and quantities only. No
+// name, price or stock is ever stored: those come from the server each time the cart is shown
+// (see use-priced-lines.ts), so a stale or edited value in storage can change nothing but what
+// the customer asked for. Orders re-check everything on the server.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 export const MAX_LINE_QTY = 99;
-const STORAGE_KEY = "ust-cart-v1";
+const STORAGE_KEY = "ust-cart-v2";
+// Version 1 stored demo product ids; those mean nothing now.
+const LEGACY_STORAGE_KEY = "ust-cart-v1";
 
 const linesSchema = z
-  .array(z.object({ product_id: z.string().max(64), quantity: z.number().int().min(1).max(MAX_LINE_QTY) }))
+  .array(z.object({ variant_id: z.guid(), quantity: z.number().int().min(1).max(MAX_LINE_QTY) }))
   .max(100);
 
 export type CartLine = z.infer<typeof linesSchema>[number];
@@ -19,16 +22,22 @@ type CartContextValue = {
   lines: CartLine[];
   hydrated: boolean;
   count: number;
-  add: (productId: string, productName: string, quantity?: number) => void;
-  setQuantity: (productId: string, productName: string, quantity: number) => void;
-  remove: (productId: string, productName: string) => void;
+  add: (variantId: string, productName: string, quantity?: number) => void;
+  setQuantity: (variantId: string, productName: string, quantity: number) => void;
+  remove: (variantId: string, productName: string) => void;
   clear: () => void;
+  /** Drops the lines of variants the server says can no longer be bought. Lines added since are untouched. */
+  drop: (variantIds: string[]) => void;
+  /** Set when lines were dropped, so the cart can say so instead of items vanishing silently. */
+  notice: string | null;
+  clearNotice: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 function readStorage(): CartLine[] {
   try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = linesSchema.safeParse(JSON.parse(raw));
@@ -48,16 +57,10 @@ function writeStorage(lines: CartLine[]) {
 
 const clampQty = (n: number) => Math.min(MAX_LINE_QTY, Math.max(1, Math.trunc(n)));
 
-export function CartProvider({
-  knownProductIds,
-  children,
-}: {
-  /** Products that can currently be sold; stored lines for anything else are dropped. */
-  knownProductIds: string[];
-  children: React.ReactNode;
-}) {
+export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   // id changes on every message so identical messages ("Added X") are re-announced.
   const [announcement, setAnnouncementState] = useState({ id: 0, text: "" });
   const setAnnouncement = useCallback(
@@ -67,14 +70,10 @@ export function CartProvider({
 
   useEffect(() => {
     // Read once after mount so server and first client render match.
-    const known = new Set(knownProductIds);
-    const stored = readStorage();
-    const valid = stored.filter((l) => known.has(l.product_id));
-    if (valid.length !== stored.length) writeStorage(valid);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLines(valid);
+    setLines(readStorage());
     setHydrated(true);
-  }, [knownProductIds]);
+  }, []);
 
   const update = useCallback((next: (prev: CartLine[]) => CartLine[]) => {
     setLines((prev) => {
@@ -89,32 +88,39 @@ export function CartProvider({
       lines,
       hydrated,
       count: lines.reduce((n, l) => n + l.quantity, 0),
-      add(productId, productName, quantity = 1) {
+      add(variantId, productName, quantity = 1) {
         update((prev) => {
-          const existing = prev.find((l) => l.product_id === productId);
+          const existing = prev.find((l) => l.variant_id === variantId);
           if (existing) {
             return prev.map((l) =>
-              l.product_id === productId ? { ...l, quantity: clampQty(l.quantity + quantity) } : l,
+              l.variant_id === variantId ? { ...l, quantity: clampQty(l.quantity + quantity) } : l,
             );
           }
-          return [...prev, { product_id: productId, quantity: clampQty(quantity) }];
+          return [...prev, { variant_id: variantId, quantity: clampQty(quantity) }];
         });
         setAnnouncement(`Added ${productName} to cart.`);
       },
-      setQuantity(productId, productName, quantity) {
-        update((prev) => prev.map((l) => (l.product_id === productId ? { ...l, quantity: clampQty(quantity) } : l)));
+      setQuantity(variantId, productName, quantity) {
+        update((prev) => prev.map((l) => (l.variant_id === variantId ? { ...l, quantity: clampQty(quantity) } : l)));
         setAnnouncement(`Quantity for ${productName} set to ${clampQty(quantity)}.`);
       },
-      remove(productId, productName) {
-        update((prev) => prev.filter((l) => l.product_id !== productId));
+      remove(variantId, productName) {
+        update((prev) => prev.filter((l) => l.variant_id !== variantId));
         setAnnouncement(`Removed ${productName} from cart.`);
       },
       clear() {
         update(() => []);
         setAnnouncement("Cart cleared.");
       },
+      drop(variantIds) {
+        const gone = new Set(variantIds);
+        if (variantIds.length > 0) setNotice("Some items are no longer available and were removed from your cart.");
+        update((prev) => (prev.some((l) => gone.has(l.variant_id)) ? prev.filter((l) => !gone.has(l.variant_id)) : prev));
+      },
+      notice,
+      clearNotice: () => setNotice(null),
     }),
-    [lines, hydrated, update, setAnnouncement],
+    [lines, hydrated, notice, update, setAnnouncement],
   );
 
   return (

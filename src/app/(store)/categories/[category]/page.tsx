@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { MessageCircle } from "lucide-react";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { PageSkeleton } from "@/components/layout/page-skeleton";
 import { TrustStrip } from "@/components/layout/trust-strip";
 import { ProductListing, ProductListingSkeleton } from "@/components/products/product-listing";
 import { SubcategoryCard } from "@/components/products/subcategory-card";
@@ -15,18 +14,19 @@ import {
   getCategoryBySlug,
   getCategoryTree,
   getChildCategories,
-  getFitments,
-  getFitmentLabels,
-  getProductsInCategory,
   getStoreSettings,
   getTractorModels,
 } from "@/services/catalog";
 
 const container = "mx-auto max-w-page px-margin lg:px-margin-desktop";
 
+// The category lookup is cached; unknown slugs block and answer 404 (see the product page).
+export const instant = false;
+
 export async function generateStaticParams() {
   const tree = await getCategoryTree();
-  return tree.map((c) => ({ category: c.slug }));
+  // Cache Components needs at least one param to prerender; "_" is no category and renders the 404.
+  return tree.length > 0 ? tree.map((c) => ({ category: c.slug })) : [{ category: "_" }];
 }
 
 export async function generateMetadata({ params }: PageProps<"/categories/[category]">): Promise<Metadata> {
@@ -34,15 +34,8 @@ export async function generateMetadata({ params }: PageProps<"/categories/[categ
   return category ? { title: category.name, description: category.description ?? undefined } : {};
 }
 
-export default function CategoryPage({ params, searchParams }: PageProps<"/categories/[category]">) {
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <CategoryContent params={params} searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function CategoryContent({ params, searchParams }: PageProps<"/categories/[category]">) {
+export default async function CategoryPage({ params, searchParams }: PageProps<"/categories/[category]">) {
+  // Resolved before anything streams, so an unknown or deactivated category answers a real 404.
   const category = await getCategoryBySlug((await params).category);
   if (!category) notFound();
 
@@ -131,7 +124,7 @@ async function CategoryContent({ params, searchParams }: PageProps<"/categories/
   );
 }
 
-async function CategoryProducts({
+function CategoryProducts({
   categoryId,
   basePath,
   searchParams,
@@ -140,20 +133,5 @@ async function CategoryProducts({
   basePath: string;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [products, models, fitments, fitmentLabels] = await Promise.all([
-    getProductsInCategory(categoryId),
-    getTractorModels(),
-    getFitments(),
-    getFitmentLabels(),
-  ]);
-  return (
-    <ProductListing
-      basePath={basePath}
-      products={products}
-      models={models}
-      fitments={fitments}
-      fitmentLabels={fitmentLabels}
-      searchParams={searchParams}
-    />
-  );
+  return <ProductListing basePath={basePath} categoryId={categoryId} searchParams={searchParams} />;
 }

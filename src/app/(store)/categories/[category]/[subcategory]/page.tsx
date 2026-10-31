@@ -3,26 +3,21 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { MessageCircle } from "lucide-react";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { PageSkeleton } from "@/components/layout/page-skeleton";
 import { ProductListing, ProductListingSkeleton } from "@/components/products/product-listing";
 import { Button } from "@/components/ui/button";
 import { whatsappHref } from "@/lib/contact";
-import {
-  getCategoryBySlug,
-  getCategoryTree,
-  getChildCategories,
-  getFitments,
-  getFitmentLabels,
-  getProductsInCategory,
-  getStoreSettings,
-  getTractorModels,
-} from "@/services/catalog";
+import { getCategoryBySlug, getCategoryTree, getChildCategories, getStoreSettings } from "@/services/catalog";
 
 type Props = PageProps<"/categories/[category]/[subcategory]">;
 
+// The category lookup is cached; unknown slugs block and answer 404 (see the product page).
+export const instant = false;
+
 export async function generateStaticParams() {
   const tree = await getCategoryTree();
-  return tree.flatMap((c) => c.children.map((s) => ({ category: c.slug, subcategory: s.slug })));
+  const params = tree.flatMap((c) => c.children.map((s) => ({ category: c.slug, subcategory: s.slug })));
+  // Cache Components needs at least one param to prerender; "_" is no category and renders the 404.
+  return params.length > 0 ? params : [{ category: "_", subcategory: "_" }];
 }
 
 async function resolve(params: Props["params"]) {
@@ -37,27 +32,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return found ? { title: `${found.category.name} | ${found.parent.name}`, description: found.category.description ?? undefined } : {};
 }
 
-export default function SubcategoryPage({ params, searchParams }: Props) {
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <SubcategoryContent params={params} searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function SubcategoryContent({ params, searchParams }: Props) {
+export default async function SubcategoryPage({ params, searchParams }: Props) {
+  // Resolved before anything streams, so an unknown or deactivated category answers a real 404.
   const found = await resolve(params);
   if (!found) notFound();
   const { parent, category } = found;
 
-  const [settings, siblings, products, models, fitments, fitmentLabels] = await Promise.all([
-    getStoreSettings(),
-    getChildCategories(parent.id),
-    getProductsInCategory(category.id),
-    getTractorModels(),
-    getFitments(),
-    getFitmentLabels(),
-  ]);
+  const [settings, siblings] = await Promise.all([getStoreSettings(), getChildCategories(parent.id)]);
   const parentPath = `/categories/${parent.slug}`;
   const basePath = `${parentPath}/${category.slug}`;
 
@@ -73,10 +54,7 @@ async function SubcategoryContent({ params, searchParams }: Props) {
         <Suspense fallback={<ProductListingSkeleton />}>
           <ProductListing
             basePath={basePath}
-            products={products}
-            models={models}
-            fitments={fitments}
-            fitmentLabels={fitmentLabels}
+            categoryId={category.id}
             searchParams={searchParams}
             groups={{
               title: parent.name,
