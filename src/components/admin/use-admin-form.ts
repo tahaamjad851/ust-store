@@ -13,7 +13,7 @@ type Options<TIn extends FieldValues, TOut> = {
    * Called with the RAW form values, after the browser-side check passed. The server parses them again
    * with the same schema, so it must get the input shape (text fields), not the parsed output.
    */
-  action: (values: TIn) => Promise<AdminResult<unknown>>;
+  action: (values: TIn, dirty: Record<string, unknown>) => Promise<AdminResult<unknown>>;
   /** Empty the form after a successful save (a form that adds things). */
   resetOnSuccess?: boolean;
 };
@@ -38,6 +38,8 @@ export function useAdminForm<TIn extends FieldValues, TOut>({ resolver, defaults
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
   const { handleSubmit, getValues, setError: setFieldError, reset } = form;
+  // Read during render so react-hook-form keeps tracking which fields the person changed.
+  const dirtyFields = form.formState.dirtyFields as Record<string, unknown>;
 
   const submit = useCallback(
     (event?: React.BaseSyntheticEvent) =>
@@ -46,7 +48,7 @@ export function useAdminForm<TIn extends FieldValues, TOut>({ resolver, defaults
         setSuccess(undefined);
         setPending(true);
         try {
-          const result = await action(getValues());
+          const result = await action(getValues(), dirtyFields);
           if (result.ok) {
             setSuccess(result.message ?? "Saved.");
             if (resetOnSuccess) reset();
@@ -63,7 +65,7 @@ export function useAdminForm<TIn extends FieldValues, TOut>({ resolver, defaults
           setPending(false);
         }
       })(event),
-    [handleSubmit, getValues, action, resetOnSuccess, reset, setFieldError],
+    [handleSubmit, getValues, dirtyFields, action, resetOnSuccess, reset, setFieldError],
   );
 
   return { form, submit, pending, error, success };

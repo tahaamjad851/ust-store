@@ -21,7 +21,10 @@ import {
 
 const productPath = (id: string) => `/admin/products/${id}`;
 
-function productRow(v: z.output<typeof productSchema>) {
+/** The details form sends the status only when the person changed that field (see EditProductForm). */
+const updateProductSchema = productSchema.extend({ status: productSchema.shape.status.optional() });
+
+function productRow(v: z.output<typeof updateProductSchema>) {
   const slug = v.slug || slugify(v.name, 120);
   if (!slug) throw new AdminError("Check the highlighted fields.", { slug: "Enter a web address (letters and numbers)" });
   return {
@@ -30,7 +33,7 @@ function productRow(v: z.output<typeof productSchema>) {
     category_id: v.category_id,
     brand_id: v.brand_id,
     product_type: v.product_type,
-    status: v.status,
+    ...(v.status ? { status: v.status } : {}),
     short_description: v.short_description,
     description: v.description,
     part_number: v.part_number,
@@ -138,7 +141,7 @@ export async function createProductAction(input: unknown): Promise<AdminResult<{
 export async function updateProductAction(id: string, input: unknown): Promise<AdminResult> {
   return runAdminAction({
     next: productPath(id),
-    schema: z.object({ id: idSchema, values: productSchema }),
+    schema: z.object({ id: idSchema, values: updateProductSchema }),
     input: { id, values: input },
     revalidate: ["products"],
     async run({ id, values }, { supabase }) {

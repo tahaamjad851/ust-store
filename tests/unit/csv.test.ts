@@ -110,7 +110,7 @@ describe("validateImport", () => {
 
   it("a new product needs a name and category; a new variant needs a price", () => {
     const r = validateImport(file("sku,product_slug,regular_price", "N-1,fresh,", "OLD-1,existing-product,5"), ctx());
-    expect(r.rows[0].errors.join("|")).toMatch(/needs a product_name.*needs a category.*needs a regular_price/s);
+    expect(r.rows[0].errors.join("|")).toMatch(/needs a product_name[\s\S]*needs a category[\s\S]*needs a regular_price/);
     expect(r.rows[1].errors).toEqual([]);
   });
 

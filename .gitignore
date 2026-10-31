@@ -30,6 +30,7 @@ supabase/.temp/
 # Test output
 playwright-report/
 test-results/
+tests/e2e/.auth/
 
 # OS / editor
 .DS_Store

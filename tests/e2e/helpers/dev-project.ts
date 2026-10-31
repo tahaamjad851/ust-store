@@ -15,14 +15,17 @@ const devRef = process.env.DB_TEST_PROJECT_REF;
 export type DevProjectStatus = { ready: true } | { ready: false; reason: string };
 
 export function devProjectStatus(): DevProjectStatus {
-  if (!url || !anonKey || !serviceKey || !devRef) {
+  const local = url !== undefined && ["127.0.0.1", "localhost"].includes(new URL(url).hostname);
+  if (!url || !anonKey || !serviceKey || (!devRef && !local)) {
     return {
       ready: false,
       reason:
         "Needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY and DB_TEST_PROJECT_REF in .env.local (DEV project only).",
     };
   }
-  if (!/^[a-z0-9]{20}$/.test(devRef) || new URL(url).hostname !== `${devRef}.supabase.co`) {
+  // A Supabase stack on this machine (`supabase start`, or a local stand-in) cannot be production.
+  if (["127.0.0.1", "localhost"].includes(new URL(url).hostname)) return { ready: true };
+  if (!devRef || !/^[a-z0-9]{20}$/.test(devRef) || new URL(url).hostname !== `${devRef}.supabase.co`) {
     throw new Error("Refusing to run: DB_TEST_PROJECT_REF must be your DEV project ref and match NEXT_PUBLIC_SUPABASE_URL.");
   }
   return { ready: true };

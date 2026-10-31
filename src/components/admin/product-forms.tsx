@@ -69,7 +69,12 @@ export function EditProductForm({ product, categories, brands }: Common & { prod
   const { form, submit, pending, error, success } = useAdminForm<ProductInput, ReturnType<typeof productSchema.parse>>({
     resolver: zodResolver(productSchema),
     defaults: toInput(product),
-    action: (values) => updateProductAction(product.id, values),
+    action: (values, dirty) => {
+      // The status is also changed by Publish and Archive; send it only if it was changed in this form,
+      // so saving the details can never undo one of those.
+      const { status, ...rest } = values;
+      return updateProductAction(product.id, dirty.status ? { ...rest, status } : rest);
+    },
   });
   // "Publish now" and "Archive" change the status outside this form. Without this the form would keep
   // the status it was loaded with and the next "Save product" would silently undo them.

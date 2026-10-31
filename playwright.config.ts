@@ -20,8 +20,13 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "mobile", use: { ...devices["Pixel 7"] } },
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    // Signs the admin, staff and customer test users in ONCE per run (not once per test) and saves their
+    // sessions, so Supabase's sign-in rate limit is never the thing that fails a test run. The browser
+    // projects depend on it, so `--project=mobile` and `--project=desktop` each work on their own.
+    { name: "admin-setup", testMatch: /admin\.setup\.ts/, teardown: "admin-teardown" },
+    { name: "admin-teardown", testMatch: /admin\.teardown\.ts/ },
+    { name: "mobile", use: { ...devices["Pixel 7"] }, dependencies: ["admin-setup"], testIgnore: /admin\.(setup|teardown)\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, dependencies: ["admin-setup"], testIgnore: /admin\.(setup|teardown)\.ts/ },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
