@@ -68,6 +68,7 @@ export function describeDbError(error: DbErrorLike): DescribedError {
   if (code === "23503") return { code: "in_use", message: "That is still in use, so it cannot be removed." };
   if (code === "23514") return { code: "check", message: "One of the values is not allowed. Check the lengths and numbers." };
   if (code === "22P02" || code === "22023") return { code: "invalid", message: "One of the values is not valid." };
+  if (code === "PGRST116") return { code: "not_found", message: "That item no longer exists, or you are not allowed to change it. Reload the page." };
   if (code === "PGRST301" || /jwt/i.test(message)) {
     return { code: "session", message: "Your session has ended. Sign in again." };
   }

@@ -9,8 +9,11 @@ import { MESSAGES } from "@/features/customers/types";
 type Options<TIn extends FieldValues, TOut> = {
   resolver: Resolver<TIn, unknown, TOut>;
   defaults: DefaultValues<TIn>;
-  /** Called with the VALIDATED values (the same parse the server repeats). */
-  action: (values: TOut) => Promise<AdminResult<unknown>>;
+  /**
+   * Called with the RAW form values, after the browser-side check passed. The server parses them again
+   * with the same schema, so it must get the input shape (text fields), not the parsed output.
+   */
+  action: (values: TIn) => Promise<AdminResult<unknown>>;
   /** Empty the form after a successful save (a form that adds things). */
   resetOnSuccess?: boolean;
 };
@@ -34,16 +37,16 @@ export function useAdminForm<TIn extends FieldValues, TOut>({ resolver, defaults
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
-  const { handleSubmit, setError: setFieldError, reset } = form;
+  const { handleSubmit, getValues, setError: setFieldError, reset } = form;
 
   const submit = useCallback(
     (event?: React.BaseSyntheticEvent) =>
-      handleSubmit(async (values) => {
+      handleSubmit(async () => {
         setError(undefined);
         setSuccess(undefined);
         setPending(true);
         try {
-          const result = await action(values);
+          const result = await action(getValues());
           if (result.ok) {
             setSuccess(result.message ?? "Saved.");
             if (resetOnSuccess) reset();
@@ -60,7 +63,7 @@ export function useAdminForm<TIn extends FieldValues, TOut>({ resolver, defaults
           setPending(false);
         }
       })(event),
-    [handleSubmit, action, resetOnSuccess, reset, setFieldError],
+    [handleSubmit, getValues, action, resetOnSuccess, reset, setFieldError],
   );
 
   return { form, submit, pending, error, success };
