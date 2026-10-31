@@ -187,3 +187,25 @@ export async function loadCouriers(db: SupabaseClient): Promise<AdminCourier[]> 
   const res = await db.from("couriers").select("id,name,sort_order,is_active").order("sort_order").order("name");
   return ok<AdminCourier[]>(res as never, "couriers");
 }
+
+// --- pieces for the product forms ---------------------------------------------------------------------------
+
+export async function loadTaxonomy(db: SupabaseClient): Promise<{ categories: AdminCategory[]; brands: AdminBrand[] }> {
+  const [categories, brands] = await Promise.all([
+    db.from("categories").select(CATEGORY_COLUMNS).order("sort_order").order("name"),
+    db.from("brands").select(BRAND_COLUMNS).order("name"),
+  ]);
+  return { categories: ok<AdminCategory[]>(categories as never, "categories"), brands: ok<AdminBrand[]>(brands as never, "brands") };
+}
+
+/** Every tractor model as "Make Model", for the compatibility editor. */
+export async function loadModelOptions(db: SupabaseClient): Promise<{ id: string; label: string; isActive: boolean }[]> {
+  const { makes, models } = await loadTractors(db);
+  const makeById = new Map(makes.map((m) => [m.id, m]));
+  return models
+    .flatMap((m) => {
+      const make = makeById.get(m.make_id);
+      return make ? [{ id: m.id, label: `${make.name} ${m.name}`, isActive: m.is_active && make.is_active }] : [];
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+}

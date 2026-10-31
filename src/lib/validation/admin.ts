@@ -201,36 +201,47 @@ export const productSchema = z.object({
 export type ProductInput = z.input<typeof productSchema>;
 export type ProductValues = z.output<typeof productSchema>;
 
-export const variantSchema = z
-  .object({
-    sku: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(SKU_PATTERN, "Use 2 to 64 capital letters, numbers, dots, dashes or slashes, starting with a letter or number"),
-    name: reqText("a variant name, like 5 L or Default", 120),
-    barcode: z
-      .string()
-      .trim()
-      .transform((v) => (v === "" ? null : v))
-      .refine((v) => v === null || /^[0-9A-Za-z-]{4,64}$/.test(v), "A barcode has 4 to 64 letters, numbers or dashes"),
-    regular_price: price,
-    sale_price: optPrice,
-    cost: optPrice,
-    weight_grams: optInt("Weight", 0, 10_000_000),
-    length_mm: optInt("Length", 0, 100_000),
-    width_mm: optInt("Width", 0, 100_000),
-    height_mm: optInt("Height", 0, 100_000),
-    is_default: z.boolean(),
-    is_active: z.boolean(),
-  })
-  .superRefine((v, ctx) => {
-    if (v.sale_price !== null && v.sale_price >= v.regular_price) {
-      ctx.addIssue({ code: "custom", path: ["sale_price"], message: "The sale price must be lower than the regular price" });
-    }
-  });
+const variantFields = z.object({
+  sku: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(SKU_PATTERN, "Use 2 to 64 capital letters, numbers, dots, dashes or slashes, starting with a letter or number"),
+  name: reqText("a variant name, like 5 L or Default", 120),
+  barcode: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : v))
+    .refine((v) => v === null || /^[0-9A-Za-z-]{4,64}$/.test(v), "A barcode has 4 to 64 letters, numbers or dashes"),
+  regular_price: price,
+  sale_price: optPrice,
+  /** Purchase cost. Only an administrator can read or set it; it is ignored for staff. */
+  cost: optPrice,
+  weight_grams: optInt("Weight", 0, 10_000_000),
+  length_mm: optInt("Length", 0, 100_000),
+  width_mm: optInt("Width", 0, 100_000),
+  height_mm: optInt("Height", 0, 100_000),
+  is_default: z.boolean(),
+  is_active: z.boolean(),
+});
+
+function saleBelowRegular(v: { sale_price: number | null; regular_price: number }, ctx: z.RefinementCtx) {
+  if (v.sale_price !== null && v.sale_price >= v.regular_price) {
+    ctx.addIssue({ code: "custom", path: ["sale_price"], message: "The sale price must be lower than the regular price" });
+  }
+}
+
+export const variantSchema = variantFields.superRefine(saleBelowRegular);
 export type VariantInput = z.input<typeof variantSchema>;
 export type VariantValues = z.output<typeof variantSchema>;
+
+/** The first variant of a new product also takes the opening stock. */
+export const newVariantSchema = variantFields
+  .extend({ initial_stock: optInt("Opening stock", 0, 1_000_000) })
+  .superRefine(saleBelowRegular);
+export type NewVariantInput = z.input<typeof newVariantSchema>;
+
+export const createProductSchema = z.object({ product: productSchema, variant: newVariantSchema });
 
 export const compatibilitySchema = z
   .object({

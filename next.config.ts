@@ -68,7 +68,8 @@ const nextConfig = (phase: string): NextConfig => {
     partialPrefetching: true,
     poweredByHeader: false,
     // forbidden() gives customers a real 403 on /admin (see src/lib/auth/session.ts).
-    experimental: { authInterrupts: true },
+    // Product photos are uploaded through a Server Action (the browser shrinks them first; the server accepts up to 4 MB).
+    experimental: { authInterrupts: true, serverActions: { bodySizeLimit: "5mb" } },
     turbopack: {
       rules: {
         "*.css": {
