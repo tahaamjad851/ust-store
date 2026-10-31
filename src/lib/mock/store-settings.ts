@@ -1,7 +1,7 @@
 // DEMO DATA: stand-in for the store_settings table until Supabase is wired up.
 // Contact details were taken from the approved designs; confirm them with the client before launch.
 // Free-delivery threshold and return period are PLACEHOLDERS, not confirmed business terms.
-import type { StoreSettings } from "@/types/store";
+import type { StoreSettings } from "./types";
 
 export const DEMO_STORE_SETTINGS: StoreSettings = {
   business_name: "Umar Siddique Traders",

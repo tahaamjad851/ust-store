@@ -1,12 +1,11 @@
-// Row shape for the planned store_settings table (single row, editable from admin).
-// Components read business details from here; nothing is hardcoded in UI.
+// Public store settings (one row in store_settings, editable from admin) plus the active delivery
+// methods. Components read business details from here; nothing is hardcoded in the UI.
+// Delivery charges are never calculated on public pages: `delivery_charge_note` is what customers see.
 
 export type DeliveryMethod = {
   id: string;
   name: string;
   description: string;
-  /** null = fee confirmed after the order is placed */
-  fee_paisa: number | null;
 };
 
 export type PaymentMethod = {
@@ -32,8 +31,10 @@ export type StoreSettings = {
   business_hours: string;
   /** null = no free-delivery offer shown */
   free_delivery_threshold_paisa: number | null;
-  /** null = return period not shown */
-  return_period_days: number | null;
+  /** Shown instead of a delivery fee, for example "Delivery charge confirmed by phone". */
+  delivery_charge_note: string;
+  /** Exchange terms, shown on product pages and in the FAQ. Empty = nothing shown. */
+  return_policy_note: string;
   delivery_methods: DeliveryMethod[];
   payment_methods: PaymentMethod[];
 };

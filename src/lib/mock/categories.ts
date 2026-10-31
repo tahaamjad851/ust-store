@@ -1,5 +1,5 @@
 // DEMO DATA: stand-in for the categories table. Names follow the approved navigation drawer design.
-import type { Category, CategoryIcon } from "@/types/catalog";
+import type { Category, CategoryIcon } from "./types";
 
 const IMG = "/images/placeholders/category.svg";
 

@@ -1,6 +1,6 @@
 // DEMO DATA: stand-in for the products table. Names, prices, stock and specs are illustrative only.
 // Images are local placeholders, not photos of the actual parts.
-import type { Product } from "@/types/catalog";
+import type { Product } from "./types";
 
 const PART_IMG = "/images/placeholders/part.svg";
 const OIL_IMG = "/images/placeholders/oil.svg";

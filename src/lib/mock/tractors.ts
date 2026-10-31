@@ -1,5 +1,5 @@
 // DEMO DATA: stand-in for the tractor_models and product_fitments tables.
-import type { ProductFitment, TractorModel } from "@/types/catalog";
+import type { ProductFitment, TractorModel } from "./types";
 
 export const DEMO_TRACTOR_MODELS: TractorModel[] = [
   { id: "tm-mf-240", make: "Massey Ferguson", model: "MF 240", year_from: 1985, year_to: null },
