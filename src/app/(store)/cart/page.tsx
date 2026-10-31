@@ -13,7 +13,6 @@ export default async function CartPage() {
       <Breadcrumbs items={[{ label: "Shopping cart" }]} />
       <h1 className="text-headline-xl-mobile lg:text-headline-xl">Shopping cart</h1>
       <CartView
-        freeDeliveryThresholdPaisa={settings.free_delivery_threshold_paisa}
         deliveryNote={settings.delivery_charge_note}
         whatsappNumber={settings.whatsapp_number}
         aside={<TrustStrip settings={settings} className="grid-cols-1 lg:grid-cols-1" />}

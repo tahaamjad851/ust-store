@@ -14,7 +14,7 @@ type LookupStatus = "loading" | "ready" | "error";
  * removed from the cart. Lines that are out of stock stay visible but are left out of the totals.
  * Components render these numbers as they are.
  */
-export function usePricedLines(freeDeliveryThresholdPaisa: number | null) {
+export function usePricedLines() {
   const { lines, hydrated, drop } = useCart();
   const [items, setItems] = useState<Map<string, CartCatalogItem>>(new Map());
   const [status, setStatus] = useState<LookupStatus>("loading");
@@ -68,13 +68,13 @@ export function usePricedLines(freeDeliveryThresholdPaisa: number | null) {
       return product ? [{ product, quantity: l.quantity }] : [];
     });
     const sellable = joined.filter((l) => l.product.stock_status !== "out_of_stock");
-    const totals = cartTotals(sellable, freeDeliveryThresholdPaisa);
+    const totals = cartTotals(sellable);
     return {
-      priced: cartTotals(joined, freeDeliveryThresholdPaisa).lines,
+      priced: cartTotals(joined).lines,
       totals,
       sellableCount: sellable.reduce((n, l) => n + l.quantity, 0),
       status,
       retry,
     };
-  }, [lines, items, freeDeliveryThresholdPaisa, status, retry]);
+  }, [lines, items, status, retry]);
 }

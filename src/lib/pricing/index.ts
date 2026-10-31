@@ -31,15 +31,12 @@ export type PricedLine<P extends PriceFields = PriceFields> = {
   quantity: number;
 };
 
-export function cartTotals<P extends PriceFields>(lines: PricedLine<P>[], freeDeliveryThresholdPaisa: number | null) {
+/** Delivery is quoted by phone, so the cart total is the items total. */
+export function cartTotals<P extends PriceFields>(lines: PricedLine<P>[]) {
   const priced_lines = lines.map((l) => {
     const unit_price_paisa = unitPrice(l.product);
     return { ...l, unit_price_paisa, line_total_paisa: unit_price_paisa * l.quantity };
   });
   const subtotal_paisa = priced_lines.reduce((sum, l) => sum + l.line_total_paisa, 0);
-  const free_delivery =
-    freeDeliveryThresholdPaisa !== null && subtotal_paisa >= freeDeliveryThresholdPaisa;
-  const remaining_for_free_delivery_paisa =
-    freeDeliveryThresholdPaisa === null ? null : Math.max(0, freeDeliveryThresholdPaisa - subtotal_paisa);
-  return { lines: priced_lines, subtotal_paisa, free_delivery, remaining_for_free_delivery_paisa };
+  return { lines: priced_lines, subtotal_paisa };
 }

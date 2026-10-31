@@ -328,7 +328,7 @@ describe("mapStoreSettings", () => {
     city: "Khanpur",
     province: "Punjab",
     business_hours: "Mon–Sat",
-    free_delivery_threshold_paisa: null,
+    announcement_text: "Open today",
     cod_enabled: true,
     bank_transfer_enabled: false,
     delivery_charge_note: "Delivery charge confirmed by phone",

@@ -47,11 +47,12 @@ begin;
 
 // Store settings (the row is created by the migration).
 const s = DEMO_STORE_SETTINGS;
-out.push(`-- Store settings (DEMO contact values; threshold and return period are PLACEHOLDERS)
+out.push(`-- Store settings (DEMO contact values; the return period is a PLACEHOLDER; no free-delivery offer)
 update public.store_settings set
   business_name = ${q(s.business_name)},
   tagline = ${q(s.tagline)},
   value_statement = ${q(s.value_statement)},
+  announcement_text = ${q(s.value_statement)},
   phone_primary = ${q(s.phone_primary)},
   phone_secondary = ${q(s.phone_secondary)},
   whatsapp_number = ${q(s.whatsapp_number)},
@@ -60,7 +61,6 @@ update public.store_settings set
   city = ${q(s.city)},
   province = ${q(s.province)},
   business_hours = ${q(s.business_hours)},
-  free_delivery_threshold_paisa = ${s.free_delivery_threshold_paisa ?? "null"},
   return_period_days = ${s.return_period_days ?? "null"},
   guest_checkout_enabled = true,
   cod_enabled = ${s.payment_methods.some((m) => m.id === "cod" && m.enabled)},

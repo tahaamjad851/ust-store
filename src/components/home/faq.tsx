@@ -1,5 +1,4 @@
 import { ChevronDown } from "lucide-react";
-import { formatPKR } from "@/lib/pricing";
 import type { StoreSettings } from "@/types/store";
 
 /** DEMO FAQ: answers are built from store settings; final wording to be confirmed with the client. */
@@ -12,11 +11,7 @@ export function Faq({ settings }: { settings: StoreSettings }) {
     },
     {
       q: "How is my order delivered?",
-      a: `We deliver across Pakistan by ${settings.delivery_methods.map((m) => m.name.toLowerCase()).join(" or ")}. ${settings.delivery_charge_note.replace(/\.+$/, "")}.${
-        settings.free_delivery_threshold_paisa !== null
-          ? ` Delivery is free on orders over ${formatPKR(settings.free_delivery_threshold_paisa)}.`
-          : ""
-      }`,
+      a: `We deliver across Pakistan by ${settings.delivery_methods.map((m) => m.name.toLowerCase()).join(" or ")}. ${settings.delivery_charge_note.replace(/\.+$/, "")}.`,
     },
     cod && { q: "Can I pay cash on delivery?", a: cod.description },
     settings.return_policy_note && {

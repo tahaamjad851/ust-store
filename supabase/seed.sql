@@ -7,20 +7,20 @@
 
 begin;
 
--- Store settings (DEMO contact values; threshold and return period are PLACEHOLDERS)
+-- Store settings (DEMO contact values; the return period is a PLACEHOLDER; no free-delivery offer)
 update public.store_settings set
   business_name = 'Umar Siddique Traders',
   tagline = 'Tractor & agricultural machinery parts',
   value_statement = 'Quality tractor parts, delivered across Pakistan',
+  announcement_text = 'Quality tractor parts, delivered across Pakistan',
   phone_primary = '0300 6701477',
   phone_secondary = '0321 8219594',
-  whatsapp_number = '923006701477',
+  whatsapp_number = '923218219594',
   email = 'umarsiddiquetraders@gmail.com',
   address_line = 'Quaid-e-Millat Road',
   city = 'Khanpur',
   province = 'Punjab',
   business_hours = 'Mon–Sat, 8:00 AM – 8:00 PM',
-  free_delivery_threshold_paisa = 1000000,
   return_period_days = 7,
   guest_checkout_enabled = true,
   cod_enabled = true,

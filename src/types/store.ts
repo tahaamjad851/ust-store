@@ -18,7 +18,7 @@ export type PaymentMethod = {
 export type StoreSettings = {
   business_name: string;
   tagline: string;
-  /** Short neutral line used in the announcement bar, hero and footer. */
+  /** Short neutral line used in the hero and footer. */
   value_statement: string;
   phone_primary: string;
   phone_secondary: string | null;
@@ -29,8 +29,8 @@ export type StoreSettings = {
   city: string;
   province: string;
   business_hours: string;
-  /** null = no free-delivery offer shown */
-  free_delivery_threshold_paisa: number | null;
+  /** Text of the top bar (store_settings.announcement_text). Empty = no text. */
+  announcement_text: string;
   /** Shown instead of a delivery fee, for example "Delivery charge confirmed by phone". */
   delivery_charge_note: string;
   /** Exchange terms, shown on product pages and in the FAQ. Empty = nothing shown. */

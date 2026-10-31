@@ -306,7 +306,7 @@ export function mapStoreSettings(row: PublicSettingsRow, deliveryMethods: Public
     city: row.city,
     province: row.province,
     business_hours: row.business_hours,
-    free_delivery_threshold_paisa: row.free_delivery_threshold_paisa,
+    announcement_text: row.announcement_text,
     delivery_charge_note: row.delivery_charge_note,
     return_policy_note: row.return_policy_note,
     delivery_methods: [...deliveryMethods]

@@ -1,5 +1,4 @@
 import { Banknote, RotateCcw, Truck, Wrench } from "lucide-react";
-import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import type { StoreSettings } from "@/types/store";
 
@@ -14,10 +13,7 @@ export function TrustStrip({ settings, className }: { settings: StoreSettings; c
     {
       icon: Truck,
       title: "Delivery across Pakistan",
-      text:
-        settings.free_delivery_threshold_paisa !== null
-          ? `Free over ${formatPKR(settings.free_delivery_threshold_paisa)}`
-          : "Courier or cargo terminal",
+      text: "Courier or cargo terminal",
     },
     {
       icon: Wrench,

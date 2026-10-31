@@ -105,7 +105,7 @@ export type StoreSettingsRow = {
   city: string;
   province: string;
   business_hours: string;
-  free_delivery_threshold_paisa: number | null;
+  announcement_text: string;
   cod_enabled: boolean;
   bank_transfer_enabled: boolean;
   delivery_charge_note: string;

@@ -23,7 +23,7 @@ import type { StoreSettings } from "@/types/store";
 type Props = {
   settings: Pick<
     StoreSettings,
-    "delivery_methods" | "payment_methods" | "free_delivery_threshold_paisa" | "delivery_charge_note" | "whatsapp_number" | "phone_primary"
+    "delivery_methods" | "payment_methods" | "delivery_charge_note" | "whatsapp_number" | "phone_primary"
   >;
 };
 
@@ -61,7 +61,7 @@ function Section({ step, title, description, children }: { step: number; title: 
 
 export function CheckoutForm({ settings }: Props) {
   const { hydrated } = useCart();
-  const { priced, totals, sellableCount, status, retry } = usePricedLines(settings.free_delivery_threshold_paisa);
+  const { priced, totals, sellableCount, status, retry } = usePricedLines();
   const [submitted, setSubmitted] = useState(false);
   const paymentMethods = settings.payment_methods.filter((m) => m.enabled);
 

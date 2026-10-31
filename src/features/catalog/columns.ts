@@ -17,7 +17,7 @@ export const VARIANT_COLUMNS = "id,product_id,sku,name,option_values,regular_pri
 export const PRODUCT_IMAGE_COLUMNS = "product_id,storage_path,alt_text,sort_order,is_primary";
 export const CARD_COMPATIBILITY_COLUMNS = "product_id,tractor_model_id";
 export const COMPATIBILITY_COLUMNS = "product_id,tractor_model_id,year_from,year_to,notes";
-export const STORE_SETTINGS_COLUMNS = "business_name,tagline,value_statement,phone_primary,phone_secondary,whatsapp_number,email,address_line,city,province,business_hours,free_delivery_threshold_paisa,cod_enabled,bank_transfer_enabled,delivery_charge_note,return_policy_note";
+export const STORE_SETTINGS_COLUMNS = "business_name,tagline,value_statement,phone_primary,phone_secondary,whatsapp_number,email,address_line,city,province,business_hours,announcement_text,cod_enabled,bank_transfer_enabled,delivery_charge_note,return_policy_note";
 export const DELIVERY_METHOD_COLUMNS = "id,name,description,sort_order";
 
 /** Every public table with its column list, for the database test and the docs. */

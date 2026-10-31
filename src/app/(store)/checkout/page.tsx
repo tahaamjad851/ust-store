@@ -15,7 +15,6 @@ export default async function CheckoutPage() {
         settings={{
           delivery_methods: settings.delivery_methods,
           payment_methods: settings.payment_methods,
-          free_delivery_threshold_paisa: settings.free_delivery_threshold_paisa,
           delivery_charge_note: settings.delivery_charge_note,
           whatsapp_number: settings.whatsapp_number,
           phone_primary: settings.phone_primary,

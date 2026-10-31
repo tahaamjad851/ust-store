@@ -104,7 +104,7 @@ export type PaymentMethod = {
 export type StoreSettings = {
   business_name: string;
   tagline: string;
-  /** Short neutral line used in the announcement bar, hero and footer. */
+  /** Short neutral line used in the hero and footer. */
   value_statement: string;
   phone_primary: string;
   phone_secondary: string | null;
@@ -115,8 +115,6 @@ export type StoreSettings = {
   city: string;
   province: string;
   business_hours: string;
-  /** null = no free-delivery offer shown */
-  free_delivery_threshold_paisa: number | null;
   /** null = return period not shown */
   return_period_days: number | null;
   delivery_methods: DeliveryMethod[];

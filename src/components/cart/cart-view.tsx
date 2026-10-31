@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Lock, MessageCircle, ShoppingCart, Trash2, Truck } from "lucide-react";
+import { ArrowLeft, Lock, MessageCircle, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductImageView } from "@/components/products/product-image";
 import { StockIndicator } from "@/components/products/stock-indicator";
@@ -12,12 +12,10 @@ import { QuantityStepper } from "./quantity-stepper";
 import { usePricedLines } from "./use-priced-lines";
 
 export function CartView({
-  freeDeliveryThresholdPaisa,
   deliveryNote,
   whatsappNumber,
   aside,
 }: {
-  freeDeliveryThresholdPaisa: number | null;
   /** From store settings: what is said about the delivery charge instead of a number. */
   deliveryNote: string;
   whatsappNumber: string;
@@ -25,7 +23,7 @@ export function CartView({
   aside?: React.ReactNode;
 }) {
   const { hydrated, setQuantity, remove, clear, notice, clearNotice } = useCart();
-  const { priced, totals, sellableCount, status, retry } = usePricedLines(freeDeliveryThresholdPaisa);
+  const { priced, totals, sellableCount, status, retry } = usePricedLines();
 
   if (!hydrated || (status === "loading" && priced.length === 0)) {
     return (
@@ -74,8 +72,6 @@ export function CartView({
       .filter((l) => l.product.stock_status !== "out_of_stock")
       .map((l) => `- ${l.quantity} x ${l.product.name}${l.product.variant_name ? `, ${l.product.variant_name}` : ""} (SKU ${l.product.sku})`)
       .join("\n");
-  const threshold = freeDeliveryThresholdPaisa;
-  const progress = threshold ? Math.min(100, Math.round((totals.subtotal_paisa / threshold) * 100)) : 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
@@ -96,28 +92,6 @@ export function CartView({
             </Button>
           </div>
         )}
-        {threshold !== null && (
-          <section aria-label="Free delivery" className="rounded-lg border border-border bg-card p-4">
-            <p className="flex items-center gap-2 text-label-lg">
-              <Truck className="size-5 text-primary" aria-hidden="true" />
-              {totals.free_delivery
-                ? "Your order qualifies for free delivery."
-                : `Add ${formatPKR(totals.remaining_for_free_delivery_paisa ?? 0)} more for free delivery.`}
-            </p>
-            <div
-              role="progressbar"
-              aria-label="Progress to free delivery"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progress}
-              className="mt-3 h-2 overflow-hidden rounded-full bg-surface-high"
-            >
-              <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="mt-2 text-body-sm text-muted-foreground">Free delivery over {formatPKR(threshold)}</p>
-          </section>
-        )}
-
         <section aria-labelledby="cart-items-title" className="rounded-lg border border-border bg-card">
           <h2 id="cart-items-title" className="sr-only">
             Items in your cart
