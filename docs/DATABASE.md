@@ -92,7 +92,7 @@ The admin panel (Phase 6) will provide archive and delete actions.
 
 | Who | How identified | Can |
 |---|---|---|
-| anon | no session | Read active categories, brands, tractor models, published products/variants/images/compatibility, approved reviews, store settings, delivery methods, shipping rates, `stock_availability()`. Nothing else. |
+| anon | no session | Read active categories, brands, tractor models, published products/variants/images/compatibility, approved reviews, store settings, delivery methods, shipping rates; call `stock_availability()` (status only) and `catalog_search()` (ids and status only). Nothing else. |
 | customer | signed in, no role row | The above, plus their own profile, addresses, wishlist, cart, orders (read), returns, reviews (verified purchases), quotes; `place_order()`, tracking and bank-transfer functions for their orders. |
 | staff | `user_roles.role = 'staff'` | Catalog, costs, stock (`adjust_stock()`), orders (`set_order_status()`, `set_payment_status()`), shipments, invoices, notes, audit log; read customers' profiles and addresses. Not roles, settings, delivery fees, bank accounts, coupons, refunds or editing customer profiles. |
 | admin | `user_roles.role = 'admin'` | Everything staff can, plus roles (not their own), store settings, delivery methods and shipping rates, private settings, bank accounts, coupons, refunds, editing and disabling accounts. |

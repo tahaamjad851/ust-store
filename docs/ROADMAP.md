@@ -20,7 +20,9 @@ This file is the single source of truth for phase status and decisions. The prod
 | 0. Setup | main | Done (`877385a`) |
 | UI foundation (storefront pages from Stitch, DEMO data) | feat/ui-foundation | Done, merged to main (`c10c9a9`) |
 | 1. Database | feat/database | Done, verified and merged |
-| 2. Auth & accounts | feat/auth | Built and reviewed; waiting for the user to apply the migration, configure the dev project and run the dev-project tests (see `docs/AUTH.md`) |
+| 2. Auth & accounts | feat/auth | Done, verified and merged |
+| 3A. Public catalog on Supabase | feat/catalog | Built and reviewed; waiting for the user to apply migration `20261031100000_catalog_public.sql` and run the checks (`docs/CATALOG.md`) |
+| 3B. Catalog admin (products, categories, brands, variants, images, compatibility, stock, prices, CSV import/export) | feat/catalog-admin (proposed) | Proposed below; **required for launch**: the client adds all products himself |
 
 ## Decisions
 
@@ -41,6 +43,10 @@ Decisions that override or narrow the spec (`docs/ust.txt`). Newest last.
 | 2026-10-29 | `services/catalog.ts` keeps reading the DEMO mock until Phase 3 (catalog). Phase 2 is auth. | – |
 | 2026-10-30 | Phase 2 sign-in is email + password only; anonymous sign-ins stay rejected. Auth pages use the existing design system. Rate limiting is Postgres-backed (no new service). | Phase 2 proposal questions 1, 3, 4 |
 | 2026-10-30 | Supabase's built-in mailer for now. **Configure custom SMTP (for example Resend) before the Phase 4 staging deploy.** | Phase 2 proposal question 2 |
+| 2026-10-31 | **Phase 3 is split.** 3A is the public catalog on Supabase; 3B is the admin for products, categories, brands, variants, images, compatibility, stock, prices and CSV import/export. 3B is required for launch because the client adds all products himself. | Single "Phase 3" |
+| 2026-10-31 | The DEMO seed stays as the development catalog for now and **must be removed before launch** (launch checklist below). | Decision of 2026-10-29 that the storefront reads the DEMO mock until Phase 3: it now reads Supabase |
+| 2026-10-31 | Out-of-stock products stay visible with an "Out of stock" label and a disabled Add to cart. Stock is shown as In stock / Low stock / Out of stock only, never as a count. | – |
+| 2026-10-31 | Delivery charge is not calculated on public pages: product pages, cart and checkout show "Delivery charge confirmed by phone". Returns: exchange within 7 days if the product is in original condition. Both texts are read from `store_settings` (`delivery_charge_note`, `return_policy_note`), never hardcoded. | – |
 
 ## Phase 1: Database
 
@@ -65,7 +71,7 @@ Tested so far:
 Low findings left open:
 - Customers see `order_status_history.note`/`actor_id` and `payments.verified_by` on their own orders (notes are documented as customer-facing; internal remarks go in `internal_notes`).
 - Coupon per-customer limits key on account or phone; phones are not verified, so a guest can bypass them by changing the number.
-- `stock_availability()` shows exact available quantities to anyone.
+- ~~`stock_availability()` shows exact available quantities to anyone.~~ Fixed in 3A: it returns the status only.
 - No per-order cap on payment-proof uploads (server-side limit planned for Phase 4); MIME type is client-declared.
 - Refund amounts are not capped against the order total in the database (admin UI / function in Phase 6).
 - Re-running the seed fails if an admin created rows with the same slug/SKU under other ids, and resets DEMO values (documented: never `--include-seed` in production).
@@ -141,6 +147,82 @@ The user's run: 36 passed, 6 failed (3 tests on mobile and desktop). Evidence an
 3. **Add-address journey: not an Activity/hidden-form problem.** After client-side navigation `new → list → edit` there is exactly one visible City input (no hidden second form). The mobile run stayed on `/new` with the same "Something went wrong" alert, which is the redirect rejection from (1) (and the first compile of the address list inside a 5 s wait); the desktop run hit the 30 s test limit of a ~30-step journey on one test against the hosted database (no page snapshot was kept; I could not see which step it was waiting on). Not a timeout bump: the journey is now three tests (details; add addresses and the default; edit and delete with API-seeded addresses), and the add test visits the address list first so its first compile happens in a navigation, not inside a 5 s assertion.
 
 Verified here: lint, typecheck, build, 120 unit tests, sign-in check in a browser against a local fake Supabase, status codes in dev and in `next start` against it. **Not** run here: any e2e test or `test:db` against the DEV project.
+
+## Phase 3A: Public catalog
+
+Branch `feat/catalog`. Details, setup steps, caching rules, limits and test commands: `docs/CATALOG.md`.
+
+### Phase 3A report (2026-10-31)
+
+Built:
+- Migration `20261031100000_catalog_public.sql`: two public texts in `store_settings` (`delivery_charge_note`, `return_policy_note`), `stock_availability()` returns the status only (closes the Phase 1 low finding), and `catalog_search()` (server-side search, filters, sort, paging; ids and a status only).
+- `src/services/catalog.ts` reads Supabase with the anon key through RLS only (no service-role use on public pages, explicit column lists, no `select *`), cached with `"use cache"` and tags. Hand-written TypeScript types (`src/types/database.ts`), pure mappers (`src/features/catalog/mappers.ts`), listing parameter parsing, `createPublicClient()`.
+- Storefront on the database: home, shop, categories and subcategories, product page (variants, compatibility, specs, related products), category drawer, mega menu, tractor selector, search, filters, sorting, pagination, stock status, product images through `next/image` with placeholders and a reserved box.
+- Cart: variant ids and quantities only in the browser; prices, names, images and stock status come from the server (`lookupCartItems`). Delivery and exchange texts come from `store_settings`. Checkout stays on the demo path.
+- `next.config.ts`: CSP and image host pinned to the exact `NEXT_PUBLIC_SUPABASE_URL` host; the production build and `next start` fail without it.
+- `docs/CATALOG.md`, launch checklist, error boundaries (`(store)/error.tsx`, `global-error.tsx`).
+
+Tested (here, against a local Postgres 17 with the real migrations and seed, and a throwaway PostgREST stand-in that lives outside the repo; **not** against your Supabase project):
+- 170 unit tests pass (48 new: mappers, listing parameters). `npm run lint`, `npm run typecheck`, `npm run build` pass.
+- 30 SQL checks on the migration (visibility of drafts, archived products, inactive variants and categories; no cost, inventory or count reachable by anon; search by name, SKU, part number, model; filters; sort; paging; wildcard and injection text).
+- 45 browser tests (`tests/e2e/catalog.spec.ts` plus the 14 visitor tests) pass on the mobile and the desktop project against `next dev`, and against a production build (`next start`, repeated three times: 228 of 228). The empty `NEXT_PUBLIC_SUPABASE_URL` build failure was checked.
+- Reviews: security-reviewer (0 critical, 0 high, 2 medium, 6 low) and ui-designer (see below).
+
+Fixed after review:
+- Cache poisoning: only common, bounded listing shapes are cached (no free text, no price range, known tractor model, first 10 pages); a malformed product slug is refused before the cached lookup.
+- `catalog_search()` now has `statement_timeout = '3s'` and a 10,000 offset cap; the migration's self-check also covers `authenticated`.
+- Cart: an out-of-stock line shows "Not included" instead of a total that is not in the sum; a visible reason when checkout is disabled; a notice when lines are removed because they are no longer sold; an inline retry when a refresh fails; a variant picker with one accessible name, a focus ring and 44px rows; live price/stock announcement; "Delivery & exchanges" heading; FAQ wording.
+- Found by running it: an empty `min=&max=` from the filter form was read as a price of 0 (zero results; this bug existed in the demo-data version too); Zod's `uuid()` rejects the seed's md5-made ids, so the model filter and the cart silently ignored them (now `guid()`); the demo "OEM ref" lives in `oem_part_numbers`, so the page now shows part number and OEM references separately; a card with a small image shrank narrower than its grid cell.
+
+Open (reasoned, not fixed):
+- **Medium: RLS is looser than the pages.** Anon can still read, through the API, published products in a deactivated category (and their variants and prices). The site and `catalog_search()` hide them; the database policies do not. Tightening the four select policies would make the existing database test fixtures (published products in an inactive category) invisible, so it is the first item of Phase 3B, together with the fixture change. Until the admin exists nobody deactivates categories except through SQL.
+- Low: no per-IP rate limit on search requests and on the cart lookup (a WAF or the host's firewall is the right place); `stock_availability()` does not apply the category rule (status only); a production deploy with an `http://localhost` Supabase URL would start (https is only enforced for non-local hosts); the DB test leaves its inactive fixture rows in the DEV project; the trust-strip card for the exchange policy is taller than its neighbours on a 360px phone; a failure of the layout above the page boundary shows the generic global error page.
+- Not part of 3A: brand filter and brand pages, specification filters, grid/list switch, items per page, wishlist, reviews, recently viewed, image zoom/gallery switching, category images, the 3B admin.
+- The first request to an unknown or deactivated URL may be answered 200 by a production server (the shell streams first); it shows the not-found page with `noindex`, later requests get 404.
+- `next dev` can answer a few concurrent first requests to a dynamic route with a 500 (a race inside the dev server, found in its source); the e2e global setup warms the routes, a production build is not affected.
+
+Needs from the user (exact steps in `docs/CATALOG.md`):
+1. Apply `supabase/migrations/20261031100000_catalog_public.sql` in the SQL Editor, record it in `supabase_migrations.schema_migrations` in a separate query, run the verification queries.
+2. `npm run test:db -- tests/integration/db/catalog-public.test.ts`, then `npm test`, then `npm run test:e2e:catalog` (or `npm run test:e2e:mobile` / `npm run test:e2e:desktop`).
+3. Decide: keep `free_delivery_threshold_paisa` (Rs 10,000 is a DEMO placeholder shown in the announcement bar, trust strip, cart and FAQ) or set it to `null`.
+4. Confirm the two texts with the client (`delivery_charge_note`, `return_policy_note`).
+
+## Phase 3B: Catalog admin (proposal)
+
+Branch `feat/catalog-admin`. Goal: the client can build the whole catalog himself, safely, and the storefront shows it. Required for launch. Nothing starts until the user says "go".
+
+Slices (each one a few small commits, each with tests):
+1. **Foundation and the RLS gap.** Admin catalog navigation under `/admin`, list and search tables, one pattern for server actions (staff session, never the service-role key; Zod on the server; `requireStaff()`/`requireAdmin()`; audit log; `revalidateTag` for the tags in `src/features/catalog/cache.ts`). Migration: `category_is_public()` and tightened select policies for products, variants, images and compatibility (closes the open medium finding); update the DB test fixtures.
+2. **Categories, brands, tractor makes and models.** Create, rename, reorder, nest (two levels, enforced), activate/deactivate, safe delete (refused while products use it). Makes and models with year ranges.
+3. **Products and variants.** Editor for every field in spec section 7 that exists in the schema: name, slug, descriptions, category, brand, type, part and OEM numbers, specs editor, oil fields, warranty, packaging, returnable, featured, status (draft, published, archived), SEO. Variants with SKU, barcode, regular and sale price, weights, sort and active flags. Cost prices in `product_variant_costs` (admin only, never in a list the storefront can reach). Compatibility editor (model, year range, notes). Product deletion rule: archive; delete only when no order references it.
+4. **Images.** Upload to the `product-images` bucket with the staff session (type and size checked in the action and by the bucket), reorder, primary, alt text, replace, remove (object and row together).
+5. **Stock and prices.** Stock overview with low-stock filter; adjust through `adjust_stock()` with a mandatory reason; thresholds through `set_stock_thresholds()`; movement history per variant; quick price editing with a confirmation for large changes.
+6. **CSV import and export.** Export (with or without cost for admins). Import in two steps: upload, then a validation report (per-row errors, duplicate SKUs in the file and against the database, unknown categories/brands, price format) with nothing written; confirm to apply in one database transaction through a SQL function. Idempotent on SKU.
+7. **Store texts.** Edit `delivery_charge_note`, `return_policy_note` and the free-delivery threshold (an admin-only settings form; the rest of settings stays in Phase 6).
+
+Decisions needed from you before "go":
+- CSV columns: one row per variant keyed by SKU (my suggestion), with product-level columns repeated, or one file for products and one for variants?
+- Who may see and edit cost prices: admin only (my suggestion) or staff too?
+- Deleting products: archive only, or also allow a real delete for products that were never ordered?
+- Image limit per product (suggest 8) and whether staff may upload (suggest yes).
+- Whether category and brand logos/images are wanted now (needs a bucket and policy) or later.
+
+Migrations: yours to apply, as before; I will give the file path, the SQL Editor steps, the `schema_migrations` insert and verification queries for each. Types stay hand-written until the CLI works; the column-list test catches drift.
+
+Tests: unit (CSV parser and validator, mappers), database (every admin write rejected for anon and customers, staff vs admin differences, import transaction, cost privacy), Playwright (admin journey; sign in once with the session helper from Phase 2 so the sign-in rate limit is not hit).
+
+Risks: cache invalidation must be right (a missed tag shows stale prices for up to 2 minutes), cost privacy, image deletion leaving orphans, and import mistakes on a live catalog (hence the dry-run report).
+
+## Launch checklist
+
+Things that must be true before the site goes live. Add to this list in every phase.
+
+- [ ] **Remove the DEMO catalog.** Archive or delete the DEMO products, categories, tractor models and compatibility rows (`docs/DATABASE.md`, "Removing demo data"; with 3B, from the admin). Set `DEMO_CATALOG_NOTICE=off` so the "Demo catalogue" notice disappears. Delete `src/lib/mock/`, `scripts/generate-seed.mjs`, `supabase/seed.sql` and the `db:seed:generate` script. Never run `db push --include-seed` against production.
+- [ ] Replace the DEMO contact details, hours, tagline and `free_delivery_threshold_paisa` in `store_settings` with the client's confirmed values (the threshold is a placeholder: set it to `null` if there is no free-delivery offer).
+- [ ] Client confirms `delivery_charge_note` and `return_policy_note` (and keeps `return_period_days` in step with the note).
+- [ ] Rewrite the product names in `tests/e2e/catalog.spec.ts`, which currently assume the DEMO seed.
+- [ ] Custom SMTP for Supabase Auth emails (before the Phase 4 staging deploy).
+- [ ] Production Supabase project: dashboard Auth settings (`docs/AUTH.md`), first admin, `NEXT_PUBLIC_SUPABASE_URL` set in the hosting environment (the production build refuses to run without it).
 
 ## Phase 0: Setup
 
