@@ -24,6 +24,7 @@ next-env.d.ts
 npm-debug.log*
 
 # Supabase local
+supabase/setup/
 supabase/.branches/
 supabase/.temp/
 

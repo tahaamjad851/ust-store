@@ -280,7 +280,7 @@ The cause was not the migration text; it was **applying by hand and recording by
 3. **End every setup with the checks**, as the last thing: `supabase/checks/schema_check.sql` must return no rows; then run the database tests against the project (`npm run test:db`, which now begins by listing anything missing). A production release is not done until both are clean.
 4. Do not run the seed on production, and do not paste a migration from chat or from an old copy: always from the committed file at the release commit.
 
-The generator for these setup files (`scripts/build-setup-sql.mjs`, with the transaction and the recording built in) is **not built yet**; it is part of the production preparation and will be tested against the same local Postgres before it is used on any project.
+The generator for these setup files is `npm run setup:build` (`scripts/build-setup-sql.mjs`); the exact steps for a new project are in `docs/PRODUCTION_SETUP.md`.
 
 ## Tests (3B)
 
