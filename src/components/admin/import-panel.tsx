@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileCheck2, Loader2, Upload } from "lucide-react";
 import { Field } from "@/components/forms/field";
 import { FormAlert } from "@/components/forms/form-alert";
@@ -13,6 +13,7 @@ export function ImportPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [report, setReport] = useState<ImportCheck | null>(null);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState<"check" | "apply" | null>(null);
 
   const formFor = (extra?: Record<string, string>) => {
@@ -56,6 +57,11 @@ export function ImportPanel() {
     }
   }
 
+  // Move focus to the result of a check, so it is read out and in view.
+  useEffect(() => {
+    if (report) headingRef.current?.focus();
+  }, [report]);
+
   const c = report?.counts;
   return (
     <div className="space-y-4">
@@ -84,7 +90,7 @@ export function ImportPanel() {
 
       {report && (
         <div className="space-y-3 rounded-lg border border-border p-4" data-testid="import-report">
-          <h3 className="text-headline-sm">{report.ok ? "The file is ready to import" : "The file has problems"}</h3>
+          <h3 ref={headingRef} tabIndex={-1} className="text-headline-sm outline-none">{report.ok ? "The file is ready to import" : "The file has problems"}</h3>
           {report.fileErrors.map((e) => (
             <p key={e} className="text-body-md text-destructive">{e}</p>
           ))}

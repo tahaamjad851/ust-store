@@ -83,7 +83,7 @@ export function SettingsForm({ settings, notificationEmails }: { settings: Admin
       <fieldset className="grid gap-4 sm:grid-cols-2">
         <legend className="mb-3 text-headline-sm">Delivery and exchange</legend>
         {area("delivery_charge_note", "Delivery note", "Shown instead of a delivery charge, for example: Delivery charge confirmed by phone.")}
-        {area("return_policy_note", "Exchange text", "Shown on product pages and in the FAQ. Empty hides it. Have the client confirm the wording.")}
+        {area("return_policy_note", "Exchange text", "Shown on product pages and in the FAQ. Empty hides it.")}
       </fieldset>
       <fieldset className="grid gap-4 sm:grid-cols-2">
         <legend className="mb-3 text-headline-sm">Prices and orders</legend>

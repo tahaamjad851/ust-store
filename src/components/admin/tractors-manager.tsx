@@ -228,10 +228,10 @@ export function TractorsManager({
                               </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <RowAction ariaLabel={`Move ${model.name} up`} disabled={i === 0} action={swap("tractor_models", makeModels, i, -1)} onResult={report} className="size-11 p-0">
+                              <RowAction ariaLabel={`Move ${make.name} ${model.name} up`} disabled={i === 0} action={swap("tractor_models", makeModels, i, -1)} onResult={report} className="size-11 p-0">
                                 <ArrowUp className="size-4" aria-hidden="true" />
                               </RowAction>
-                              <RowAction ariaLabel={`Move ${model.name} down`} disabled={i === makeModels.length - 1} action={swap("tractor_models", makeModels, i, 1)} onResult={report} className="size-11 p-0">
+                              <RowAction ariaLabel={`Move ${make.name} ${model.name} down`} disabled={i === makeModels.length - 1} action={swap("tractor_models", makeModels, i, 1)} onResult={report} className="size-11 p-0">
                                 <ArrowDown className="size-4" aria-hidden="true" />
                               </RowAction>
                               <Button type="button" variant="outline" className="h-11" aria-label={`Edit ${make.name} ${model.name}`} onClick={() => { setEditingModel(editingModel === model.id ? null : model.id); setAddingModelTo(null); setNotice(null); }}>

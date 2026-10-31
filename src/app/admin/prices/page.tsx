@@ -27,7 +27,7 @@ export default async function DailyPricesPage() {
           <>
             Change prices, sale prices, stock and availability for many items at once, then press <strong>Save changes</strong>. Everything is saved
             together or not at all. Orders already placed keep the price they were placed at. A change of more than {alertPercent}% asks you to
-            confirm.
+            confirm. Stock changed here is recorded as a correction without a typed reason; use the Stock page to say why.
           </>
         }
       />

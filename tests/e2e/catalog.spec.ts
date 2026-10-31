@@ -395,7 +395,7 @@ test.describe("product page", () => {
     await page.goto(`/products/${CLUTCH_PLATE_SLUG}`);
     const info = page.locator("section[aria-labelledby='delivery-title']");
     await expect(info.getByText("Delivery charge confirmed by phone")).toBeVisible();
-    await expect(info.getByText("Exchange within 7 days if the product is in original condition.")).toBeVisible();
+    await expect(info.getByText("Exchange accepted if the product is not damaged, within 7 days.")).toBeVisible();
     await expect(info.getByText(/Rs\s?\d/)).toHaveCount(0);
   });
 

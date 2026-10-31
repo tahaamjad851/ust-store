@@ -391,6 +391,9 @@ security definer
 set search_path = ''
 as $$
 begin
+  if not public.is_admin() then
+    raise exception 'not_authorized' using errcode = '42501';
+  end if;
   if new.storage_path !~ ('^products/' || new.product_id::text || '/[A-Za-z0-9_-]{8,64}\.(jpg|png|webp|avif)$') then
     raise exception 'invalid_image_path' using errcode = '23514';
   end if;
@@ -822,6 +825,46 @@ end;
 $$;
 revoke all on function public.import_catalog(jsonb, text) from public, anon;
 grant execute on function public.import_catalog(jsonb, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- A hidden category also stops ordering and stock status (not only what RLS shows)
+-- ---------------------------------------------------------------------------
+-- A customer can still hold a variant id (cart, wishlist, old page). _place_order() and stock_availability()
+-- are SECURITY DEFINER and bypass RLS, so they need the same rule.
+create or replace function public.stock_availability(p_variant_ids uuid[])
+returns table (variant_id uuid, status text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select i.variant_id,
+         case
+           when i.on_hand - i.reserved <= 0 then 'out_of_stock'
+           when i.on_hand - i.reserved <= i.low_stock_threshold then 'low_stock'
+           else 'in_stock'
+         end
+    from public.inventory i
+    join public.product_variants v on v.id = i.variant_id and v.is_active
+    join public.products p on p.id = v.product_id and p.status = 'published' and public.category_is_public(p.category_id)
+   where i.variant_id = any (p_variant_ids[1:200]);
+$$;
+
+do $$
+declare
+  v_oid oid;
+  v_def text;
+  v_needle constant text := 'and p.status = ''published''';
+begin
+  select p.oid into v_oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = '_place_order';
+  v_def := pg_get_functiondef(v_oid);
+  if (length(v_def) - length(replace(v_def, v_needle, ''))) / length(v_needle) <> 1 then
+    raise exception '_place_order() no longer has exactly one published-product check; update this migration';
+  end if;
+  execute replace(v_def, v_needle, v_needle || ' and public.category_is_public(p.category_id)');
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Check: the public surface is exactly what this migration intends

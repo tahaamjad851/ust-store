@@ -1,6 +1,6 @@
 # Public catalog (Phase 3A)
 
-The storefront reads categories, tractor makes and models, products, variants, images, compatibility and store settings from Supabase. Admin screens to edit them are Phase 3B; until then the catalog is whatever is in the database (the DEMO seed in development).
+The storefront reads categories, tractor makes and models, products, variants, images, compatibility and store settings from Supabase. The admin screens that edit them are described under "Admin (Phase 3B)" below.
 
 ## How a page gets its data
 
@@ -35,7 +35,7 @@ All of it runs in the database: `public.catalog_search()` (migration `2026103110
 | Listings, product pages | 1 min / 2 min / 15 min | `catalog`, `catalog-products`, `catalog-stock` |
 | Home page cards | 5 min / 2 min / 15 min | same |
 
-Only bounded listing shapes are cached (no free text, no price range, a tractor model that exists, the first 10 pages); a malformed product slug is refused before the cached lookup; free-text searches and the cart lookup are never cached, so made-up URLs cannot fill the cache. **Phase 3B** admin actions must call `revalidateTag(tag, "max")` for what they change (categories → `catalog-categories`, products/variants/images/compatibility → `catalog-products`, prices and stock → `catalog-products` and `catalog-stock`, settings → `catalog-settings`). **Phase 4** order placement must revalidate `catalog-stock`. Until then a change shows up within the lifetimes above. Money and stock stay authoritative in the database: `place_order()` re-prices and re-checks everything.
+Only bounded listing shapes are cached (no free text, no price range, a tractor model that exists, the first 10 pages); a malformed product slug is refused before the cached lookup; free-text searches and the cart lookup are never cached, so made-up URLs cannot fill the cache. Since **Phase 3B** the admin actions expire the tags for what they change with `updateTag()`, so a change shows on the next request (categories → `catalog-categories`, products/variants/images/compatibility → `catalog-products`, prices and stock → `catalog-products` and `catalog-stock`, settings → `catalog-settings`). **Phase 4** order placement must revalidate `catalog-stock`; until then a stock change caused by an order shows within the lifetimes above. Money and stock stay authoritative in the database: `place_order()` re-prices and re-checks everything.
 
 Product and category pages are prerendered for what exists at build time (the 48 newest products, every category) and rendered on first visit for the rest. An unknown or deactivated URL shows the not-found page with `noindex`; the status is 404 (the first request to a URL that was never generated may be answered 200 by a production server, because the page shell streams first).
 
@@ -49,13 +49,7 @@ Category images (`categories.image_path`) have no bucket yet; only a shipped `/i
 
 Browser only (`localStorage` key `ust-cart-v2`): `[{ variant_id, quantity }]` and nothing else. The cart and checkout pages send the variant ids to a Server Action (`lookupCartItems`), which returns name, image, price and stock status from the database; unknown or no-longer-sold variants are dropped from the cart, out-of-stock lines stay visible but are left out of the total and block "Proceed to checkout". Checkout is still the DEMO path (nothing is sent) until Phase 4.
 
-Delivery is never calculated on public pages. Product page, cart and checkout show `store_settings.delivery_charge_note`; the product page and FAQ show `store_settings.return_policy_note`. Both are columns of `store_settings` (public, admin-editable in 3B). Until then change them in the SQL editor:
-
-```sql
-update public.store_settings
-   set delivery_charge_note = 'Delivery charge confirmed by phone',
-       return_policy_note   = 'Exchange within 7 days if the product is in original condition.';
-```
+Delivery is never calculated on public pages, and there is no free-delivery offer. Product page, cart and checkout show `store_settings.delivery_charge_note`; the product page and FAQ show `store_settings.return_policy_note` (since 3B: "Exchange accepted if the product is not damaged, within 7 days.", to be confirmed by the client). The top bar shows `store_settings.announcement_text`. All three are edited in **Admin > Settings**.
 
 `store_settings.return_period_days` is still what `request_return()` enforces; keep it in step with the note (7 days).
 
@@ -148,7 +142,91 @@ The catalog e2e tests never sign in, so they cannot hit the Supabase sign-in rat
 - A product with several variants is listed with its display variant's price and stock; filters and sorting use that variant too.
 - The product page gallery shows the first image large and the others as small static images (no zoom or switching yet).
 - Reviews, wishlist, recently viewed, brand pages, offers, new-arrivals and best-sellers pages are not part of 3A.
-- **RLS is looser than the pages (open, medium):** the database policies hide drafts and archived products and inactive variants, but not products in a deactivated category; the site and `catalog_search()` hide those, the API does not. Fixed first in Phase 3B (needs the database test fixtures changed too).
+- ~~RLS looser than the pages~~ Closed in 3B: products, variants, images and compatibility in a deactivated category (or under a deactivated parent) are no longer readable through the API (`category_is_public()`).
 - No per-IP rate limit on search and cart lookups; use the host's firewall until one is added.
 - If the layout (header, footer, menus) cannot load, for example when the database is unreachable, `src/app/global-error.tsx` shows a plain page; inside the shop, `(store)/error.tsx` shows the normal chrome.
-- Free-delivery messages (announcement bar, trust strip, cart progress, FAQ) still show when `store_settings.free_delivery_threshold_paisa` is set. The DEMO seed sets it to Rs 10,000, a placeholder: set it to `null` (`update public.store_settings set free_delivery_threshold_paisa = null;`) unless the client confirms a real offer.
+
+## Admin (Phase 3B)
+
+Everything under `/admin`, for staff and admins. Pages read and write with the **signed-in user's** Supabase session (never the service-role key), so row-level security and the database functions decide. The pattern: `src/features/admin/action.ts`.
+
+| Screen | What it does | Who |
+|---|---|---|
+| Daily prices (`/admin/prices`) | Table of every variant: search, category filter, inline regular and sale price, quick stock, available/unavailable. **Save changes** sends everything to `apply_daily_changes()`: one transaction, all or nothing. Each price change is logged (who, old, new, when, source). A change above `store_settings.price_change_alert_percent` (20 by default) must be confirmed; the database enforces this, not only the page. A page that went stale (someone else changed the row) is refused. Existing orders keep their prices (order lines are snapshots). | staff, admin |
+| Products (`/admin/products`) | List and editor: every section-7 field the schema has, description with preview, specifications, variants (SKU, barcode, prices, size, default, available), photos, tractor compatibility, archive, delete. New products start as drafts. | staff, admin |
+| Cost prices | Variant cost field, export column, CSV `cost` column. | **admin only** (database policy, not just hidden) |
+| Real delete of a product or variant | Only for things **never ordered** (the database refuses otherwise: `product_has_orders`, `variant_has_orders`). A never-ordered variant's stock ledger is deleted with it and the audit log records the delete. Archive is the normal way to stop selling. | admin only |
+| Categories, brands, tractor makes and models | Create, rename, reorder, show/hide, delete. Two category levels (a trigger enforces it). Delete is refused while anything uses it (products, subcategories, coupon targets, models). | staff edit, admin deletes |
+| Stock (`/admin/stock`) | Overview with filters, change stock (reason required, through `adjust_stock()`), low-stock and reorder levels, history per variant. | staff, admin |
+| Import / export | See below. | staff, admin (costs: admin) |
+| Settings (`/admin/settings`) | Business name, tagline, top bar text, phones, WhatsApp (typed as 0321 8219594, stored as 923218219594), email, address, hours, delivery note, exchange text, price-alert percentage, the private email for new orders, and the courier list. | **admin only** |
+
+Every catalog table has an audit trigger (`audit_row_change()`): action, entity and the **names of changed columns, never values**, so a cost cannot leak into the log. Price changes are in `price_changes`, stock in `stock_movements`.
+
+### Photos
+
+Up to 8 per product, in the public `product-images` bucket at `products/<product id>/<random>.<ext>` (the database refuses any other path, and a 9th photo). The browser shrinks a photo to 1600 px and re-encodes it (WebP) before upload, which also drops its metadata (for example GPS). The server accepts up to 4 MB and decides the type from the file's first bytes (JPEG, PNG, WebP, AVIF only; no SVG). The first photo is the main one; reorder, replace, remove and alt text are on the product page. Removing a photo deletes the row first and the file after; a file that could not be deleted is only an orphan in the bucket (logged).
+
+### CSV (one row per variant, keyed by SKU)
+
+The columns are listed on the Import page (`src/features/catalog/csv/columns.ts`). A blank cell keeps the current value; a single `-` clears a field. Step 1 **checks** the file and writes nothing: every problem is listed with its line number (unknown category or brand, bad price, sale not below regular, duplicate SKU or barcode in the file or the catalogue, a SKU that belongs to another product, stock below what is reserved, and so on). Step 2 applies the **same file** (its hash must match) through `import_catalog()` in one transaction, after validating it again against the catalogue as it is at that moment. Exports are UTF-8 with a byte-order mark (Excel); cells that could run as a formula are prefixed with an apostrophe; the cost column is filled for admins only. Limits: 2 MB, 5,000 rows. Specifications, tractor compatibility and photos are not in the CSV.
+
+### Cache
+
+Each admin action declares what it touches and expires the matching tags with `updateTag()` (`PUBLIC_TAGS` in `action.ts`), so a price, stock or visibility change shows on the public site on the next request, not after the cache lifetime.
+
+## Applying the 3B migration (no CLI needed)
+
+File: `supabase/migrations/20261101100000_catalog_admin.sql`. Run it **once**.
+
+1. Supabase dashboard (**dev** project) > **SQL Editor** > New query. Paste the whole file > **Run**. Expect `Success. No rows returned`. It ends with a self-check that raises an error (and rolls everything back) if anon or a customer can execute an unexpected function, if anon can read costs, price history, couriers or inventory, or if a free-delivery threshold is still set.
+2. New query (separate), record it:
+
+```sql
+insert into supabase_migrations.schema_migrations (version, name)
+values ('20261101100000', 'catalog_admin')
+on conflict (version) do nothing;
+```
+
+3. New query, verify:
+
+```sql
+select free_delivery_threshold_paisa, return_policy_note, price_change_alert_percent, announcement_text from public.store_settings;
+-- null | Exchange accepted if the product is not damaged, within 7 days. | 20 | (your top bar text)
+select count(*) from public.couriers;                          -- 7
+select to_regclass('public.price_changes');                    -- price_changes
+select proname from pg_proc
+ where proname in ('apply_daily_changes','import_catalog','category_is_public','catalog_reorder','set_primary_image')
+ order by 1;                                                   -- 5 rows
+select policyname, qual from pg_policies
+ where tablename = 'product_variant_costs' and cmd = 'SELECT'; -- the condition uses is_full_admin()
+set role anon;
+select count(*) from public.price_changes;                      -- ERROR: permission denied (that is the point)
+reset role;
+select version, name from supabase_migrations.schema_migrations order by version desc limit 2;
+-- 20261101100000 | catalog_admin   then   20261031100000 | catalog_public
+```
+
+The last `select` before `reset role` must fail; run `reset role;` afterwards in any case. To bring the DEMO data in line (top bar text, WhatsApp 0321 8219594) either edit them in **Admin > Settings** or re-run the seed on the dev project only.
+
+First admin and staff accounts: `docs/DATABASE.md`.
+
+## Tests (3B)
+
+| What | Command | Needs |
+|---|---|---|
+| Unit: money parsing, daily-price logic, error messages, CSV parser/validator/export, image type check, schemas, row builders | `npm test` | nothing |
+| Database: every admin write refused for anon and customers, cost privacy, never-ordered delete rule, price log and confirmation, import atomicity, photo and category rules | `npm run test:db -- tests/integration/db/catalog-admin.test.ts` | DEV project, migration applied. The fixtures use an active category `ust-test` while the tests run and deactivate it afterwards: do not run them while browsing the shop |
+| Browser: the admin journey (daily prices, add product with photo, variants, archive, delete, stock, CSV, settings, staff and customer limits) | `npm run test:e2e:mobile`, `npm run test:e2e:desktop` (each on its own), or `npx playwright test tests/e2e/admin.spec.ts --project=desktop` | DEV project and `.env.local`; first run: `npx playwright install chromium` |
+
+The admin tests do **not** use the login form. A setup project (`tests/e2e/admin.setup.ts`) creates an administrator, a staff member and a customer, signs each in **once per run** from the test process and saves the sessions in `tests/e2e/.auth/` (git-ignored); a teardown project deletes the users. The number of sign-ins therefore does not grow with the number of tests, and Supabase's sign-in rate limit is not touched. The login form itself is still tested by `auth.spec.ts`. The admin tests create only **draft** products named `ZZ E2E ...`, which the shop never shows, and delete them afterwards. If the base URL's Supabase is a stack on this machine (`127.0.0.1`), `DB_TEST_PROJECT_REF` is not needed.
+
+## Known limitations (3B)
+
+- The list pages (Daily prices, Products, Stock) load the whole catalogue and filter in the browser. Fine for a few thousand variants; beyond about 20,000 rows they stop with an error and would need server-side paging.
+- Staff cannot delete anything and cannot see or set costs; an admin must do both. Settings, couriers and costs are admin only.
+- The quick stock edit on Daily prices records a fixed reason ("Quick edit on Daily prices"); the Stock page asks for a real one.
+- Creating a product and its first variant is two database calls. If the second fails the product stays as a draft and the page says so (a staff member cannot delete the draft; an admin can).
+- CSV does not cover specifications, tractor compatibility or photos.
+- Category and brand images and logos are not part of 3B.
+- `place_order()` still contains the free-shipping rule. It stays off because the threshold is null and no screen can set it; remove the rule in Phase 4.

@@ -86,7 +86,7 @@ update public.products set status = 'archived'
  where id in (select product_id from public.product_variants where sku in (/* DEMO SKUs */));
 ```
 
-The admin panel (Phase 6) will provide archive and delete actions.
+Since Phase 3B the admin does this: archive any product, and (as an administrator) delete products that were never ordered, with a confirmation. The seed's products were never ordered, so they can be deleted from **Admin > Products**.
 
 ## Roles and access
 

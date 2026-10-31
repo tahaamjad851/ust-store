@@ -81,22 +81,35 @@ export function DailyPricesTable({
   useEffect(() => {
     if (!dirty) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
+    // beforeunload does not fire for in-app navigation (a menu link, a product link), so ask there too.
+    const onClick = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!link || link.target === "_blank" || link.origin !== window.location.origin || link.pathname === window.location.pathname) return;
+      if (!window.confirm("You have changes that are not saved. Leave without saving them?")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
     window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
   }, [dirty]);
 
   const filtered = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     return rows.filter((r) => {
       if (categoryId && !r.categoryIds.includes(categoryId)) return false;
-      if (filter === "changed" && !checks.get(r.variantId)?.change && !(checks.get(r.variantId) && Object.keys(checks.get(r.variantId)!.errors).length)) return false;
+      if (filter === "changed" && !edits[r.variantId]) return false;
       if (filter === "unavailable" && r.isActive) return false;
       if (filter === "low" && r.level === "ok") return false;
       if (words.length === 0) return true;
       const haystack = `${r.productName} ${r.variantName} ${r.sku} ${r.partNumber ?? ""} ${r.categoryName} ${r.brandName ?? ""}`.toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
-  }, [rows, query, categoryId, filter, checks]);
+  }, [rows, query, categoryId, filter, edits]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -229,7 +242,7 @@ export function DailyPricesTable({
         {result && <FormAlert tone={result.tone}>{result.text}</FormAlert>}
       </div>
 
-      <div role="table" aria-label="Prices, stock and availability" aria-rowcount={filtered.length + 1} className="rounded-lg border border-border bg-card">
+      <div role="table" aria-label="Prices, stock and availability" className="rounded-lg border border-border bg-card">
         <div role="rowgroup" className="hidden md:block">
           <div role="row" className={cn("grid items-end gap-3 border-b border-border bg-surface-low px-4 py-2 text-label-md uppercase text-muted-foreground", GRID)}>
             <div role="columnheader">Product</div>
@@ -281,7 +294,7 @@ export function DailyPricesTable({
                   </label>
                   <Input
                     id={`reg-${r.variantId}`}
-                    aria-label={`Regular price in rupees for ${label}`}
+                    aria-label={`Regular price (Rs), ${label}`}
                     inputMode="decimal"
                     value={regularText}
                     onChange={(ev) => edit(r.variantId, { regular: ev.target.value })}
@@ -301,7 +314,7 @@ export function DailyPricesTable({
                   </label>
                   <Input
                     id={`sale-${r.variantId}`}
-                    aria-label={`Sale price in rupees for ${label}, empty for no sale`}
+                    aria-label={`Sale price (Rs), ${label}`}
                     inputMode="decimal"
                     placeholder="No sale"
                     value={saleText}
@@ -322,7 +335,7 @@ export function DailyPricesTable({
                   </label>
                   <Input
                     id={`stock-${r.variantId}`}
-                    aria-label={`Stock on hand for ${label}`}
+                    aria-label={`Stock on hand, ${label}`}
                     inputMode="numeric"
                     value={stockText}
                     onChange={(ev) => edit(r.variantId, { onHand: ev.target.value })}
@@ -336,17 +349,17 @@ export function DailyPricesTable({
                     </p>
                   )}
                 </div>
-                <div role="cell" className="flex min-h-11 items-center gap-2">
-                  <input
-                    id={`active-${r.variantId}`}
-                    type="checkbox"
-                    checked={active}
-                    onChange={(ev) => edit(r.variantId, { isActive: ev.target.checked })}
-                    className="size-5 accent-primary"
-                    aria-label={`Available in the shop: ${label}`}
-                  />
-                  <label htmlFor={`active-${r.variantId}`} className="text-body-md">
-                    {active ? "Available" : "Unavailable"}
+                <div role="cell">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2 text-body-md">
+                    <input
+                      id={`active-${r.variantId}`}
+                      type="checkbox"
+                      checked={active}
+                      onChange={(ev) => edit(r.variantId, { isActive: ev.target.checked })}
+                      className="size-5 accent-primary"
+                      aria-label={`Available in shop, ${label}`}
+                    />
+                    Available in shop
                   </label>
                 </div>
               </div>
@@ -358,7 +371,7 @@ export function DailyPricesTable({
       <Pager page={currentPage} pageCount={pageCount} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} noun="variants" />
 
       <div className="sticky bottom-0 z-10 -mx-margin flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card/95 px-margin py-3 backdrop-blur lg:mx-0 lg:rounded-lg lg:border" data-testid="save-bar">
-        <p role="status" className="text-body-md">
+        <p className="text-body-md">
           {dirty ? (
             <>
               <strong className="tabular">{pendingChanges.length}</strong> change{pendingChanges.length === 1 ? "" : "s"} not saved

@@ -58,7 +58,8 @@ export function dbCheck<T>(res: { data: T; error: DbErrorLike | null }, what: st
   if (res.error) {
     const described = describeDbError(res.error);
     console.error(`admin: ${what} failed`, res.error.code ?? "no code", res.error.message);
-    throw new AdminError(described.message, undefined, described.code, res.error.details ?? undefined);
+    // The database's own detail text is logged above, never sent to the browser.
+    throw new AdminError(described.message, undefined, described.code);
   }
   return res.data;
 }

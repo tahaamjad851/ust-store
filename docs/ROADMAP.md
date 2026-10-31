@@ -21,8 +21,8 @@ This file is the single source of truth for phase status and decisions. The prod
 | UI foundation (storefront pages from Stitch, DEMO data) | feat/ui-foundation | Done, merged to main (`c10c9a9`) |
 | 1. Database | feat/database | Done, verified and merged |
 | 2. Auth & accounts | feat/auth | Done, verified and merged |
-| 3A. Public catalog on Supabase | feat/catalog | Built and reviewed; waiting for the user to apply migration `20261031100000_catalog_public.sql` and run the checks (`docs/CATALOG.md`) |
-| 3B. Catalog admin (products, categories, brands, variants, images, compatibility, stock, prices, CSV import/export) | feat/catalog-admin (proposed) | Proposed below; **required for launch**: the client adds all products himself |
+| 3A. Public catalog on Supabase | feat/catalog | Done, verified and merged |
+| 3B. Catalog admin (daily prices, products, variants, images, compatibility, categories, brands, tractors, stock, CSV, settings) | feat/catalog-admin | Built and reviewed; waiting for the user to apply migration `20261101100000_catalog_admin.sql` and run the checks (`docs/CATALOG.md`) |
 
 ## Decisions
 
@@ -47,6 +47,10 @@ Decisions that override or narrow the spec (`docs/ust.txt`). Newest last.
 | 2026-10-31 | The DEMO seed stays as the development catalog for now and **must be removed before launch** (launch checklist below). | Decision of 2026-10-29 that the storefront reads the DEMO mock until Phase 3: it now reads Supabase |
 | 2026-10-31 | Out-of-stock products stay visible with an "Out of stock" label and a disabled Add to cart. Stock is shown as In stock / Low stock / Out of stock only, never as a count. | – |
 | 2026-10-31 | Delivery charge is not calculated on public pages: product pages, cart and checkout show "Delivery charge confirmed by phone". Returns: exchange within 7 days if the product is in original condition. Both texts are read from `store_settings` (`delivery_charge_note`, `return_policy_note`), never hardcoded. | – |
+| 2026-11-01 | **3B decisions.** CSV: one file, one row per variant, keyed by SKU. Cost prices are visible to admins only. Deleting: archive by default; a real delete (admin only) for products and variants that were never ordered, never for anything an order refers to. Up to 8 photos per product; category and brand images later. | 3B proposal questions |
+| 2026-11-01 | **No free-delivery offer.** Delivery is quoted by phone. `free_delivery_threshold_paisa` is set to null by migration `20261101100000`; every mention is gone from public pages, the seed and the mock data. The top bar text comes from `store_settings.announcement_text`. `place_order()` still holds the free-shipping rule (off while the threshold is null): remove it in Phase 4. | Decision of 2026-10-31 about a DEMO threshold |
+| 2026-11-01 | Exchange text: "Exchange accepted if the product is not damaged, within 7 days." (client to confirm). Couriers (TCS, Daewoo, Leopards, M&P, Trax, Pakistan Post, Other) live in a `couriers` table, edited by the admin, for later use on orders. The owner's order-notification email is private (`store_private_settings`). Bank and EasyPaisa details are not part of 3B. | 2026-10-31 exchange wording |
+| 2026-11-01 | Staff edit prices, products, stock, categories and so on; only an admin sets costs, deletes, and edits settings and couriers. Admin pages and actions use the signed-in session, never the service-role key. | Phase 1 "staff: catalog and costs" |
 
 ## Phase 1: Database
 
@@ -175,7 +179,7 @@ Fixed after review:
 - Found by running it: an empty `min=&max=` from the filter form was read as a price of 0 (zero results; this bug existed in the demo-data version too); Zod's `uuid()` rejects the seed's md5-made ids, so the model filter and the cart silently ignored them (now `guid()`); the demo "OEM ref" lives in `oem_part_numbers`, so the page now shows part number and OEM references separately; a card with a small image shrank narrower than its grid cell.
 
 Open (reasoned, not fixed):
-- **Medium: RLS is looser than the pages.** Anon can still read, through the API, published products in a deactivated category (and their variants and prices). The site and `catalog_search()` hide them; the database policies do not. Tightening the four select policies would make the existing database test fixtures (published products in an inactive category) invisible, so it is the first item of Phase 3B, together with the fixture change. Until the admin exists nobody deactivates categories except through SQL.
+- ~~**Medium: RLS is looser than the pages.**~~ Closed in 3B (migration `20261101100000`, `category_is_public()`). Original note: Anon can still read, through the API, published products in a deactivated category (and their variants and prices). The site and `catalog_search()` hide them; the database policies do not. Tightening the four select policies would make the existing database test fixtures (published products in an inactive category) invisible, so it is the first item of Phase 3B, together with the fixture change. Until the admin exists nobody deactivates categories except through SQL.
 - Low: no per-IP rate limit on search requests and on the cart lookup (a WAF or the host's firewall is the right place); `stock_availability()` does not apply the category rule (status only); a production deploy with an `http://localhost` Supabase URL would start (https is only enforced for non-local hosts); the DB test leaves its inactive fixture rows in the DEV project; the trust-strip card for the exchange policy is taller than its neighbours on a 360px phone; a failure of the layout above the page boundary shows the generic global error page.
 - Not part of 3A: brand filter and brand pages, specification filters, grid/list switch, items per page, wishlist, reviews, recently viewed, image zoom/gallery switching, category images, the 3B admin.
 - The first request to an unknown or deactivated URL may be answered 200 by a production server (the shell streams first); it shows the not-found page with `noindex`, later requests get 404.
@@ -187,39 +191,73 @@ Needs from the user (exact steps in `docs/CATALOG.md`):
 3. Decide: keep `free_delivery_threshold_paisa` (Rs 10,000 is a DEMO placeholder shown in the announcement bar, trust strip, cart and FAQ) or set it to `null`.
 4. Confirm the two texts with the client (`delivery_charge_note`, `return_policy_note`).
 
-## Phase 3B: Catalog admin (proposal)
+## Phase 3B: Catalog admin
 
-Branch `feat/catalog-admin`. Goal: the client can build the whole catalog himself, safely, and the storefront shows it. Required for launch. Nothing starts until the user says "go".
+Branch `feat/catalog-admin`. Details, migration steps, tests and limits: `docs/CATALOG.md` ("Admin (Phase 3B)").
 
-Slices (each one a few small commits, each with tests):
-1. **Foundation and the RLS gap.** Admin catalog navigation under `/admin`, list and search tables, one pattern for server actions (staff session, never the service-role key; Zod on the server; `requireStaff()`/`requireAdmin()`; audit log; `revalidateTag` for the tags in `src/features/catalog/cache.ts`). Migration: `category_is_public()` and tightened select policies for products, variants, images and compatibility (closes the open medium finding); update the DB test fixtures.
-2. **Categories, brands, tractor makes and models.** Create, rename, reorder, nest (two levels, enforced), activate/deactivate, safe delete (refused while products use it). Makes and models with year ranges.
-3. **Products and variants.** Editor for every field in spec section 7 that exists in the schema: name, slug, descriptions, category, brand, type, part and OEM numbers, specs editor, oil fields, warranty, packaging, returnable, featured, status (draft, published, archived), SEO. Variants with SKU, barcode, regular and sale price, weights, sort and active flags. Cost prices in `product_variant_costs` (admin only, never in a list the storefront can reach). Compatibility editor (model, year range, notes). Product deletion rule: archive; delete only when no order references it.
-4. **Images.** Upload to the `product-images` bucket with the staff session (type and size checked in the action and by the bucket), reorder, primary, alt text, replace, remove (object and row together).
-5. **Stock and prices.** Stock overview with low-stock filter; adjust through `adjust_stock()` with a mandatory reason; thresholds through `set_stock_thresholds()`; movement history per variant; quick price editing with a confirmation for large changes.
-6. **CSV import and export.** Export (with or without cost for admins). Import in two steps: upload, then a validation report (per-row errors, duplicate SKUs in the file and against the database, unknown categories/brands, price format) with nothing written; confirm to apply in one database transaction through a SQL function. Idempotent on SKU.
-7. **Store texts.** Edit `delivery_charge_note`, `return_policy_note` and the free-delivery threshold (an admin-only settings form; the rest of settings stays in Phase 6).
+### Phase 3B report (2026-11-01)
 
-Decisions needed from you before "go":
-- CSV columns: one row per variant keyed by SKU (my suggestion), with product-level columns repeated, or one file for products and one for variants?
-- Who may see and edit cost prices: admin only (my suggestion) or staff too?
-- Deleting products: archive only, or also allow a real delete for products that were never ordered?
-- Image limit per product (suggest 8) and whether staff may upload (suggest yes).
-- Whether category and brand logos/images are wanted now (needs a bucket and policy) or later.
+Built:
+- Migration `20261101100000_catalog_admin.sql`: closes the 3A RLS gap (`category_is_public()`; also applied to `_place_order()` and `stock_availability()`, so a hidden category stops ordering too); costs admin-only; only an admin deletes; "never delete what an order refers to" enforced by `BEFORE DELETE` guards (a never-ordered variant's stock ledger is deleted with it, audited); `price_changes` log; `apply_daily_changes()` and `import_catalog()` (one transaction each); two category levels; photo path, limit and primary rules; audit triggers (column names only); couriers; `announcement_text`, `price_change_alert_percent`; free-delivery threshold set to null; the exchange text.
+- Admin under `/admin`: Daily prices, Products (every section-7 field the schema has, description preview, specifications, variants, photos, compatibility, archive, delete), Categories, Brands, Tractors, Stock (reason required, history), Import/Export (validation report first, then apply), Settings and couriers (admin only). One action pattern: signed-in session, never the service-role key; Zod; error mapping; cache tags expired so the shop updates at once.
+- Storefront: every free-delivery mention removed (pages, types, mock data, seed); the top bar reads `store_settings.announcement_text`.
 
-Migrations: yours to apply, as before; I will give the file path, the SQL Editor steps, the `schema_migrations` insert and verification queries for each. Types stay hand-written until the CLI works; the column-list test catches drift.
+Tested here (not against your Supabase project):
+- Migration on a local Postgres 17 (PGlite) with the real migrations and seed: 151 checks plus 6 for the hidden-category rule, all pass (RLS for anon, customer, staff, admin; cost privacy; refused writes; delete rules with a real order; price log and confirmation; atomic saves; image and category rules; import).
+- Unit tests (`npm test`): money, daily-price logic, error messages, CSV parser/validator/export, image type check, schemas, row builders.
+- Browser: the admin journey ran in Chromium against a local stand-in for Supabase built on the same Postgres (auth, REST with real row-level security, storage); passes on the mobile and the desktop project, each run on its own. Scratch scripts additionally checked categories, brands, tractors, products, photos (a text file named .png is refused), stock, settings, CSV, and that the public shop changes at once.
+- Reviews: security-reviewer (0 critical, 0 high, 2 medium, 4 low) and ui-designer (1 high, many medium/low).
 
-Tests: unit (CSV parser and validator, mappers), database (every admin write rejected for anon and customers, staff vs admin differences, import transaction, cost privacy), Playwright (admin journey; sign in once with the session helper from Phase 2 so the sign-in rate limit is not hit).
+Written but **not run** (need your DEV project and the migration applied): `tests/integration/db/catalog-admin.test.ts`, and `tests/e2e/admin.spec.ts` against the hosted project. The stand-in is not Supabase: PostgREST, Auth and Storage details (for example `Prefer` headers, the storage upload format, JWT handling) are only verified where the stand-in imitates them.
 
-Risks: cache invalidation must be right (a missed tag shows stale prices for up to 2 minutes), cost privacy, image deletion leaving orphans, and import mistakes on a live catalog (hence the dry-run report).
+Fixed after review:
+- Security M1: a product in a hidden category could still be ordered or show a stock status (`_place_order()` and `stock_availability()` did not apply the category rule).
+- Security L1/L4: database error details are no longer sent to the browser; the image trigger refuses non-staff.
+- UI high: unsaved Daily prices edits are no longer lost silently when following a link or the menu. Medium: accessible names contain the visible label, whole-cell checkbox, no re-announcing on every keystroke, owner-facing wording, focus to the import report, an admin error page. A customer now gets a real 403 (removed `admin/loading.tsx`).
+- Found by running it: forms sent parsed instead of raw values to the server; new categories landed first; "Publish now" followed by "Save product" silently reverted to draft (the details form now sends the status only if changed there); the price parser accepted "12,,".
+
+Open (reasoned, not fixed):
+- Medium: the large-change confirmation exists only on Daily prices. A CSV import (or the variant editor) can change many prices at once with no confirmation, only the price log. The CSV check does not yet flag large changes. Also the table allows a price of 0 (the functions refuse it).
+- Low: `price_change_alert_percent` is readable by anyone (the settings table is public); the ledger-purge setting is a plain database setting, safe today because nothing can set it through the API (hardening: require trigger depth); `bodySizeLimit` of 5 MB applies to every Server Action; staff can overwrite any object in the photo bucket by calling the API directly.
+- UI (not done): visible reason beside a disabled Delete button on phones; focus return after closing inline forms; a sticky save bar on the product form; the Daily prices page is tall on a 360px phone (about 260px per row); problems table in the import report scrolls sideways on phones; no loading skeleton (a `loading.tsx` would make the 403 a 200); courier add has no pending state.
+- The e2e dev server can answer a first concurrent request slowly (cold compile); the admin tests allow 20 s for uploads.
+- `place_order()` still contains the free-shipping rule (off while the threshold is null): remove it in Phase 4.
+- Screens were reviewed in a desktop browser and from code; the phone layout of the admin was not checked visually on a device.
+
+Needs from the user:
+1. Apply `supabase/migrations/20261101100000_catalog_admin.sql` in the SQL Editor, record it in `schema_migrations` in a separate query, run the verification queries (`docs/CATALOG.md`).
+2. `npm run test:db -- tests/integration/db/catalog-admin.test.ts`, then `npm test`, then `npm run test:e2e:mobile` and `npm run test:e2e:desktop` (first run: `npx playwright install chromium`).
+3. Create your admin account (and staff) as in `docs/DATABASE.md`; in Admin > Settings check the contact details, WhatsApp, the owner's order email, and have the client confirm the exchange text.
+4. Decide: should an import or the variant editor also ask for confirmation of large price changes (my suggestion: yes, in the import check report)?
+
+## Phase 4 proposal: Orders (nothing starts until you say "go")
+
+Goal: a customer can place an order (guest or signed in), the owner is told, and staff can run it to delivery. Money and stock stay authoritative in `place_order()`.
+
+Slices:
+1. **Checkout on the database.** Replace the demo checkout with a server action that rate-limits and calls `place_order()` / `place_order_as_guest()` (service role only for the guest path, as designed); idempotency key; field-level errors from the stable error codes; order confirmation page with the order number and a tracking link for guests. Remove the free-shipping rule from `place_order()` (new migration). Delivery stays "confirmed by phone"; the order total is the items total, shipping added by staff later (needs a decision: how staff record the agreed delivery charge on an order).
+2. **Payments v1.** COD and bank transfer only (EasyPaisa/JazzCash and online gateways later). Bank accounts table and admin screen (admin only, never seeded), `get_bank_transfer_details()` on the confirmation page, payment reference/proof upload to the private bucket with server-side checks, staff verification (`set_payment_status()`).
+3. **Admin orders.** List with search and filters, order detail, status changes through `set_order_status()` (valid transitions only), internal notes, shipment with courier (from the couriers list) and tracking number, cancellation (releases stock once), returns and refunds (admin).
+4. **Notifications.** Email to the owner's private address for each new order and to the customer (order placed, shipped), through custom SMTP/Resend (launch checklist item), outbox table already exists; WhatsApp link only, no WhatsApp API.
+5. **Customer account.** Order history and detail, tracking by token, reorder.
+6. **Stock events.** Revalidate `catalog-stock` on order placement and cancellation; low-stock alert email.
+
+Decisions needed first: how the delivery charge is added to an order; whether guest checkout stays on; which payment methods at launch; the email provider and sender address; invoice wording (no tax lines, decided).
+
+Tests: unit (checkout schema, totals), database (place order, idempotency, cancellation releases once, permissions), Playwright (guest order, signed-in order, admin fulfils it) with the one-time session helper from 3B.
+
+Risks: double submits and stock races (covered by the database functions, to be proven under concurrency on the DEV project), email deliverability, proof-of-payment uploads, abuse of guest checkout.
 
 ## Launch checklist
 
 Things that must be true before the site goes live. Add to this list in every phase.
 
 - [ ] **Remove the DEMO catalog.** Archive or delete the DEMO products, categories, tractor models and compatibility rows (`docs/DATABASE.md`, "Removing demo data"; with 3B, from the admin). Set `DEMO_CATALOG_NOTICE=off` so the "Demo catalogue" notice disappears. Delete `src/lib/mock/`, `scripts/generate-seed.mjs`, `supabase/seed.sql` and the `db:seed:generate` script. Never run `db push --include-seed` against production.
-- [ ] Replace the DEMO contact details, hours, tagline and `free_delivery_threshold_paisa` in `store_settings` with the client's confirmed values (the threshold is a placeholder: set it to `null` if there is no free-delivery offer).
-- [ ] Client confirms `delivery_charge_note` and `return_policy_note` (and keeps `return_period_days` in step with the note).
+- [ ] Replace the DEMO contact details, hours and tagline in `store_settings` with the client's confirmed values (Admin > Settings). There is no free-delivery offer (threshold is null).
+- [ ] Client confirms `delivery_charge_note` and `return_policy_note` (and keeps `return_period_days` in step with the note: 7).
+- [ ] Production: apply `20261101100000_catalog_admin.sql`; create the first admin and the staff accounts; set the owner's order-notification email and the WhatsApp number in Admin > Settings; add real products (Admin > Products or CSV) and delete the DEMO ones.
+- [ ] Remove the free-shipping rule from `place_order()` (Phase 4), now that there is no free-delivery offer.
+- [ ] Dashboard Auth settings: a disabled account must also be banned in Supabase Auth (Phase 6).
 - [ ] Rewrite the product names in `tests/e2e/catalog.spec.ts`, which currently assume the DEMO seed.
 - [ ] Custom SMTP for Supabase Auth emails (before the Phase 4 staging deploy).
 - [ ] Production Supabase project: dashboard Auth settings (`docs/AUTH.md`), first admin, `NEXT_PUBLIC_SUPABASE_URL` set in the hosting environment (the production build refuses to run without it).

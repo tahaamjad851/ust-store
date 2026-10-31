@@ -247,3 +247,15 @@ describe("categories have two levels", () => {
     await admin.client.from("categories").delete().eq("id", top.data!.id);
   });
 });
+
+describe("a hidden category also stops ordering and stock status", () => {
+  it("refuses an order for a variant whose category is deactivated, and shows no stock status", async () => {
+    const hidden = await service.from("categories").insert({ slug: `zz-hid-${run}`, name: `ZZ hid ${RUN}`, is_active: false }).select("id").single();
+    const holder = await createFixture(admin, "hidcat", { pricePaisa: 10_000, stock: 3 });
+    await service.from("products").update({ category_id: hidden.data!.id }).eq("id", holder.productId);
+    const order = await customer.client.rpc("place_order", orderArgs(holder, [{ variant_id: holder.variantId, quantity: 1 }]));
+    expect(order.error?.message).toMatch(/item_unavailable/);
+    const status = await anon().rpc("stock_availability", { p_variant_ids: [holder.variantId] });
+    expect(status.data).toEqual([]);
+  });
+});
