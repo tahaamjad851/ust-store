@@ -209,3 +209,62 @@ export async function loadModelOptions(db: SupabaseClient): Promise<{ id: string
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 }
+
+// --- CSV import and export -------------------------------------------------------------------------------------------
+
+export type ExportData = {
+  categories: AdminCategory[];
+  brands: AdminBrand[];
+  products: AdminProductDetail[];
+  variants: (Omit<AdminVariantDetail, "cost_paisa" | "on_hand" | "reserved">)[];
+  stock: Map<string, number>;
+  /** Empty for staff: costs are admin-only in the database. */
+  costs: Map<string, number>;
+};
+
+export async function loadExportData(db: SupabaseClient): Promise<ExportData> {
+  const [categories, brands, products, variants, inventory, costs] = await Promise.all([
+    fetchAll<AdminCategory>("categories", (a, b) => db.from("categories").select(CATEGORY_COLUMNS).order("id").range(a, b)),
+    fetchAll<AdminBrand>("brands", (a, b) => db.from("brands").select(BRAND_COLUMNS).order("id").range(a, b)),
+    fetchAll<AdminProductDetail>("products", (a, b) => db.from("products").select(PRODUCT_COLUMNS).order("name").order("id").range(a, b)),
+    fetchAll<ExportData["variants"][number]>("variants", (a, b) => db.from("product_variants").select(VARIANT_DETAIL_COLUMNS).order("product_id").order("sort_order").order("id").range(a, b)),
+    fetchAll<{ variant_id: string; on_hand: number }>("inventory", (a, b) => db.from("inventory").select("variant_id,on_hand").order("variant_id").range(a, b)),
+    fetchAll<{ variant_id: string; cost_paisa: number }>("costs", (a, b) => db.from("product_variant_costs").select("variant_id,cost_paisa").order("variant_id").range(a, b)),
+  ]);
+  return {
+    categories,
+    brands,
+    products,
+    variants,
+    stock: new Map(inventory.map((i) => [i.variant_id, i.on_hand])),
+    costs: new Map(costs.map((c) => [c.variant_id, c.cost_paisa])),
+  };
+}
+
+/** Everything validateImport() needs to know about the current catalogue. */
+export async function loadImportContext(db: SupabaseClient, canSetCost: boolean): Promise<import("@/features/catalog/csv/validate").ImportContext> {
+  const [categories, brands, products, variants, inventory] = await Promise.all([
+    fetchAll<AdminCategory>("categories", (a, b) => db.from("categories").select(CATEGORY_COLUMNS).order("id").range(a, b)),
+    fetchAll<AdminBrand>("brands", (a, b) => db.from("brands").select(BRAND_COLUMNS).order("id").range(a, b)),
+    fetchAll<{ id: string; slug: string }>("products", (a, b) => db.from("products").select("id,slug").order("id").range(a, b)),
+    fetchAll<{ id: string; product_id: string; sku: string; barcode: string | null; regular_price_paisa: number; sale_price_paisa: number | null }>("variants", (a, b) =>
+      db.from("product_variants").select("id,product_id,sku,barcode,regular_price_paisa,sale_price_paisa").order("id").range(a, b),
+    ),
+    fetchAll<{ variant_id: string; reserved: number }>("inventory", (a, b) => db.from("inventory").select("variant_id,reserved").order("variant_id").range(a, b)),
+  ]);
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const categoriesByPath = new Map<string, string>();
+  for (const c of categories) {
+    const parent = c.parent_id ? byId.get(c.parent_id) : undefined;
+    categoriesByPath.set((parent ? `${parent.slug}/${c.slug}` : c.slug).toLowerCase(), c.id);
+  }
+  const brandsByName = new Map<string, string[]>();
+  for (const b of brands) brandsByName.set(b.name.toLowerCase(), [...(brandsByName.get(b.name.toLowerCase()) ?? []), b.id]);
+  const slugOf = new Map(products.map((p) => [p.id, p.slug]));
+  const reserved = new Map(inventory.map((i) => [i.variant_id, i.reserved]));
+  const variantsBySku = new Map(
+    variants.map((v) => [v.sku, { productSlug: slugOf.get(v.product_id) ?? "", regularPaisa: v.regular_price_paisa, salePaisa: v.sale_price_paisa, reserved: reserved.get(v.id) ?? 0 }]),
+  );
+  const barcodeOwner = new Map(variants.flatMap((v) => (v.barcode ? [[v.barcode, v.sku] as const] : [])));
+  return { categoriesByPath, brandsByName, existingSlugs: new Set(products.map((p) => p.slug)), variantsBySku, barcodeOwner, canSetCost };
+}
