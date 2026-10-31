@@ -161,15 +161,16 @@ describe("drafts, archived products and inactive variants are invisible to anon"
     const res = await anon().from("products").select("slug,status").like("slug", `ust-test-${run}-%`);
     const slugs = (res.data ?? []).map((r: Row) => String(r.slug).replace(`ust-test-${run}-`, "")).sort();
     expect(res.error).toBeNull();
-    // novariant and offcat are published rows too: hiding them is catalog_search()'s and the service's job, not RLS's.
-    expect(slugs).toEqual(["low", "multi", "novariant", "offcat", "oos", "pub", "sale"]);
+    // novariant is a published row too (it has no active variant): hiding it is catalog_search()'s and the
+    // service's job. offcat is published but in a deactivated category: RLS hides it since Phase 3B.
+    expect(slugs).toEqual(["low", "multi", "novariant", "oos", "pub", "sale"]);
     expect((res.data ?? []).every((r: Row) => r.status === "published")).toBe(true);
   });
 
   it("hides the variants of draft and archived products and inactive variants", async () => {
     const res = await anon().from("product_variants").select("sku").like("sku", `UST-CAT-${RUN}-%`);
     const skus = (res.data ?? []).map((r: Row) => String(r.sku).replace(`UST-CAT-${RUN}-`, "")).sort();
-    expect(skus).toEqual(["LOW", "MULTI", "MULTI-B", "OFFCAT", "OOS", "PUB", "SALE"]);
+    expect(skus).toEqual(["LOW", "MULTI", "MULTI-B", "OOS", "PUB", "SALE"]);
   });
 
   it("does not return them from catalog_search() either, nor products in an inactive category", async () => {

@@ -92,7 +92,9 @@ export async function createFixture(admin: TestUser, label: string, opts: { pric
   const category = must(
     await service
       .from("categories")
-      .upsert({ slug: "ust-test", name: "UST TEST (automated tests)", is_active: false }, { onConflict: "parent_id,slug" })
+      // Active, because a product in an inactive category is not readable by anon (Phase 3B). It is deactivated
+      // again, and the products archived, in archiveFixtures(); do not run these tests while browsing the shop.
+      .upsert({ slug: "ust-test", name: "UST TEST (automated tests)", is_active: true }, { onConflict: "parent_id,slug" })
       .select("id")
       .single(),
     "category",
@@ -128,9 +130,10 @@ export async function createFixture(admin: TestUser, label: string, opts: { pric
   return { productId: product.id, variantId: variant.id, sku, pricePaisa: opts.pricePaisa, deliveryMethodId: DELIVERY_METHOD_ID, shippingPaisa: SHIPPING_PAISA };
 }
 
-/** Archives fixtures so they disappear from the storefront (rows with ledger history cannot be deleted). */
+/** Archives fixtures so they disappear from the storefront (ordered products cannot be deleted). */
 export async function archiveFixtures() {
   ok(await service.from("products").update({ status: "archived" }).like("slug", `ust-test-${run}-%`), "archive products");
+  ok(await service.from("categories").update({ is_active: false }).eq("slug", "ust-test").is("parent_id", null), "deactivate fixture category");
   if (deliveryReady) ok(await service.from("delivery_methods").update({ is_active: false }).eq("id", DELIVERY_METHOD_ID), "archive delivery");
 }
 
