@@ -17,7 +17,12 @@ if (!url || !anonKey || !serviceKey) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY.");
 }
 // The tests create admin users, publish products and place orders, so they must never hit production.
-if (!devRef || !/^[a-z0-9]{20}$/.test(devRef) || new URL(url).hostname !== `${devRef}.supabase.co`) {
+// A Supabase stack on this machine (127.0.0.1 / localhost) cannot be production, so it needs no project ref.
+const isLocal = ["127.0.0.1", "localhost"].includes(new URL(url).hostname);
+if (process.env.UST_EXPECT_LOCAL === "1" && !isLocal) {
+  throw new Error("UST_EXPECT_LOCAL=1 but the Supabase URL is not on this machine; refusing to run.");
+}
+if (!isLocal && (!devRef || !/^[a-z0-9]{20}$/.test(devRef) || new URL(url).hostname !== `${devRef}.supabase.co`)) {
   throw new Error(
     "Refusing to run: set DB_TEST_PROJECT_REF to your DEV project ref; it must match NEXT_PUBLIC_SUPABASE_URL.",
   );

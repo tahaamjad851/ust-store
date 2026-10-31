@@ -9,9 +9,20 @@ import { anon, archiveFixtures, createUser, deleteUsers, RUN, service, type Test
 const run = RUN.toLowerCase();
 type Row = Record<string, unknown>;
 
-function ok<T>(res: { data: T; error: { message: string } | null }, what: string): NonNullable<T> {
-  if (res.error || res.data === null || res.data === undefined) throw new Error(`${what}: ${res.error?.message ?? "no data"}`);
-  return res.data as NonNullable<T>;
+/**
+ * A write that does not ask for its row back (no .select()) answers 201 with an EMPTY body on the real
+ * PostgREST (Prefer: return=minimal is the default), so supabase-js gives data: null and error: null.
+ * That is a success: ok() checks the error only. Use must() when the row is needed.
+ */
+function ok<T>(res: { data: T; error: { message: string } | null }, what: string): T {
+  if (res.error) throw new Error(`${what}: ${res.error.message}`);
+  return res.data;
+}
+
+function must<T>(res: { data: T; error: { message: string } | null }, what: string): NonNullable<T> {
+  const data = ok(res, what);
+  if (data === null || data === undefined) throw new Error(`${what}: no data returned (did the query forget .select()?)`);
+  return data as NonNullable<T>;
 }
 
 let admin: TestUser;
@@ -37,7 +48,7 @@ async function makeProduct(
     compatible?: boolean;
   } = {},
 ) {
-  const product = ok(
+  const product = must(
     await service
       .from("products")
       .insert({
@@ -53,7 +64,7 @@ async function makeProduct(
     `product ${label}`,
   );
   const sku = `UST-CAT-${RUN}-${label.toUpperCase()}`;
-  const variant = ok(
+  const variant = must(
     await service
       .from("product_variants")
       .insert({
@@ -99,18 +110,18 @@ const labelsOf = (hits: { product_id: string }[]) =>
 
 beforeAll(async () => {
   admin = await createUser("catalog-admin", "admin");
-  parentCategory = ok(await service.from("categories").insert({ slug: `ust-cat-${run}`, name: `UST TEST ${RUN} parent` }).select("id").single(), "parent category").id;
-  childCategory = ok(
+  parentCategory = must(await service.from("categories").insert({ slug: `ust-cat-${run}`, name: `UST TEST ${RUN} parent` }).select("id").single(), "parent category").id;
+  childCategory = must(
     await service.from("categories").insert({ slug: `ust-sub-${run}`, name: `UST TEST ${RUN} child`, parent_id: parentCategory }).select("id").single(),
     "child category",
   ).id;
-  inactiveCategory = ok(
+  inactiveCategory = must(
     await service.from("categories").insert({ slug: `ust-off-${run}`, name: `UST TEST ${RUN} off`, is_active: false }).select("id").single(),
     "inactive category",
   ).id;
-  brandId = ok(await service.from("brands").insert({ slug: `ust-brand-${run}`, name: `Zorbrand${RUN}` }).select("id").single(), "brand").id;
-  makeId = ok(await service.from("tractor_makes").insert({ slug: `ust-make-${run}`, name: `Zormake${RUN}` }).select("id").single(), "make").id;
-  modelId = ok(await service.from("tractor_models").insert({ make_id: makeId, slug: `ust-model-${run}`, name: `Zormodel${RUN} 385` }).select("id").single(), "model").id;
+  brandId = must(await service.from("brands").insert({ slug: `ust-brand-${run}`, name: `Zorbrand${RUN}` }).select("id").single(), "brand").id;
+  makeId = must(await service.from("tractor_makes").insert({ slug: `ust-make-${run}`, name: `Zormake${RUN}` }).select("id").single(), "make").id;
+  modelId = must(await service.from("tractor_models").insert({ make_id: makeId, slug: `ust-model-${run}`, name: `Zormodel${RUN} 385` }).select("id").single(), "model").id;
 
   await makeProduct("pub", { stock: 20, brand: true, partNumber: `PN-${RUN}`, compatible: true, regular: 250_000 });
   await makeProduct("sale", { stock: 20, regular: 900_000, sale: 700_000 });
@@ -122,7 +133,7 @@ beforeAll(async () => {
   await makeProduct("offcat", { stock: 5, category: inactiveCategory });
   // Two variants: the default is out of stock, the second one is in stock.
   const multi = await makeProduct("multi", { regular: 400_000 });
-  const second = ok(
+  const second = must(
     await service
       .from("product_variants")
       .insert({ product_id: multi.product, sku: `${multi.sku}-B`, name: "Second", regular_price_paisa: 10_000, sort_order: 5 })
@@ -138,12 +149,25 @@ beforeAll(async () => {
   ok(await service.from("product_variant_costs").insert({ variant_id: ids.pub.variant, cost_paisa: 90_000 }), "cost");
 });
 
+/** Deletes what this file created. Falls back to hiding it where a delete is refused (see below). */
+async function removeOrHide(table: "categories" | "brands" | "tractor_models" | "tractor_makes", id: string | undefined) {
+  if (!id) return;
+  const deleted = await service.from(table).delete().eq("id", id);
+  if (deleted.error) await service.from(table).update({ is_active: false }).eq("id", id);
+}
+
 afterAll(async () => {
-  await archiveFixtures();
-  await service.from("categories").update({ is_active: false }).in("id", [parentCategory, childCategory].filter(Boolean));
-  await service.from("brands").update({ is_active: false }).eq("id", brandId);
-  await service.from("tractor_models").update({ is_active: false }).eq("id", modelId);
-  await service.from("tractor_makes").update({ is_active: false }).eq("id", makeId);
+  // Leave nothing behind. These products were never ordered, so with the Phase 3B migration they can be
+  // deleted (their stock ledger goes with them); before it, a ledger row blocks the delete and the fallback
+  // archives them instead, as before. The rows they used are removed after them, children first.
+  const gone = await service.from("products").delete().like("slug", `ust-test-${run}-%`);
+  if (gone.error) await archiveFixtures();
+  await removeOrHide("categories", childCategory);
+  await removeOrHide("categories", inactiveCategory);
+  await removeOrHide("categories", parentCategory);
+  await removeOrHide("brands", brandId);
+  await removeOrHide("tractor_models", modelId);
+  await removeOrHide("tractor_makes", makeId);
   await deleteUsers();
 });
 
