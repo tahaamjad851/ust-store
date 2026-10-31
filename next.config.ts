@@ -95,7 +95,17 @@ const nextConfig = (phase: string): NextConfig => {
       dangerouslyAllowLocalIP: isDev && origin !== null && LOOPBACK_HOSTS.has(origin.hostname),
     },
     async headers() {
-      return [{ source: "/:path*", headers: securityHeaders(origin) }];
+      return [
+        { source: "/:path*", headers: securityHeaders(origin) },
+        // The tracking link is the key to an order: no shared cache may keep it, no search engine may list it.
+        {
+          source: "/order/:token*",
+          headers: [
+            { key: "Cache-Control", value: "private, no-store" },
+            { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          ],
+        },
+      ];
     },
   };
 };

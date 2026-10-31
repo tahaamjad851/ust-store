@@ -22,7 +22,22 @@ This file is the single source of truth for phase status and decisions. The prod
 | 1. Database | feat/database | Done, verified and merged |
 | 2. Auth & accounts | feat/auth | Done, verified and merged |
 | 3A. Public catalog on Supabase | feat/catalog | Done, verified and merged |
-| 3B. Catalog admin (daily prices, products, variants, images, compatibility, categories, brands, tractors, stock, CSV, settings) | feat/catalog-admin | Built and reviewed; waiting for the user to apply migration `20261101100000_catalog_admin.sql` and run the checks (`docs/CATALOG.md`) |
+| 3B. Catalog admin (daily prices, products, variants, images, compatibility, categories, brands, tractors, stock, CSV, settings) | feat/catalog-admin | Built and reviewed; the dev project has it applied and verified (3A repair + 3B, `schema_check.sql` clean, DB tests pass) |
+| 4. Orders (checkout, tracking, admin orders, customer history, slip, owner e-mail) | feat/orders | Built and reviewed; waiting for the user to apply migration `20261102100000_orders.sql`, run its verification queries and then the tests (`docs/ORDERS.md`). Not committed, not pushed |
+
+## Known failing e2e tests (must be fixed before merge to main)
+
+Five Playwright tests fail on the **mobile** project and have **not been investigated**. They are not caused by Phase 4 and were deliberately left alone: they must not be fixed, skipped or weakened as a side effect of other work. Fix them (with a root-cause investigation, as for the Phase 2 failures) before `feat/catalog-admin`, `feat/orders` or anything built on them is merged to main.
+
+| Test | Area |
+|---|---|
+| `tests/e2e/admin.spec.ts:50` | admin: daily prices |
+| `tests/e2e/admin.spec.ts:143` | admin: stock |
+| `tests/e2e/admin.spec.ts:200` | admin: staff permissions |
+| `tests/e2e/auth.spec.ts:235` | account: addresses |
+| `tests/e2e/auth.spec.ts:276` | account: addresses |
+
+Phase 4's own specs (`tests/e2e/orders.spec.ts`) are run on their own, never as part of the full e2e suite, until these are fixed.
 
 ## Decisions
 
@@ -48,10 +63,15 @@ Decisions that override or narrow the spec (`docs/ust.txt`). Newest last.
 | 2026-10-31 | Out-of-stock products stay visible with an "Out of stock" label and a disabled Add to cart. Stock is shown as In stock / Low stock / Out of stock only, never as a count. | – |
 | 2026-10-31 | Delivery charge is not calculated on public pages: product pages, cart and checkout show "Delivery charge confirmed by phone". Returns: exchange within 7 days if the product is in original condition. Both texts are read from `store_settings` (`delivery_charge_note`, `return_policy_note`), never hardcoded. | – |
 | 2026-11-01 | **3B decisions.** CSV: one file, one row per variant, keyed by SKU. Cost prices are visible to admins only. Deleting: archive by default; a real delete (admin only) for products and variants that were never ordered, never for anything an order refers to. Up to 8 photos per product; category and brand images later. | 3B proposal questions |
-| 2026-11-01 | **No free-delivery offer.** Delivery is quoted by phone. `free_delivery_threshold_paisa` is set to null by migration `20261101100000`; every mention is gone from public pages, the seed and the mock data. The top bar text comes from `store_settings.announcement_text`. `place_order()` still holds the free-shipping rule (off while the threshold is null): remove it in Phase 4. | Decision of 2026-10-31 about a DEMO threshold |
+| 2026-11-01 | **No free-delivery offer.** Delivery is quoted by phone. `free_delivery_threshold_paisa` is set to null by migration `20261101100000`; every mention is gone from public pages, the seed and the mock data. The top bar text comes from `store_settings.announcement_text`. The free-shipping rule in `place_order()` was removed in Phase 4. | Decision of 2026-10-31 about a DEMO threshold |
 | 2026-11-01 | Exchange text: "Exchange accepted if the product is not damaged, within 7 days." (client to confirm). Couriers (TCS, Daewoo, Leopards, M&P, Trax, Pakistan Post, Other) live in a `couriers` table, edited by the admin, for later use on orders. The owner's order-notification email is private (`store_private_settings`). Bank and EasyPaisa details are not part of 3B. | 2026-10-31 exchange wording |
 | 2026-11-01 | Staff edit prices, products, stock, categories and so on; only an admin sets costs, deletes, and edits settings and couriers. Admin pages and actions use the signed-in session, never the service-role key. | Phase 1 "staff: catalog and costs" |
 | 2026-11-02 | **3A repair.** On the dev project `20261031100000` was recorded but not applied (found when 3B failed with `42703 return_policy_note`). New migration `20261031100100_catalog_public_repair.sql` (idempotent; sorts between 3A and 3B), `supabase/checks/schema_check.sql` (read-only schema check), and a preflight in the DB tests that lists what the project lacks. Production setup rule: never record a migration separately from applying it (`docs/CATALOG.md`, "Production setup"). | A migration list is not proof that a migration took effect |
+| 2026-11-02 | **Phase 4 workflow.** New > Contacted > Confirmed > Dispatched > Delivered, plus Cancelled (until delivery) and Exchange requested (after delivery, then back to Delivered). "New" is the stored status `pending`; `contacted` and `exchange_requested` were added; `processing`, `shipped` and `returned` stay in the enum but nothing leads into them. Enforced by `_order_transition_allowed()` in the database. Stock is **deducted when the order is Delivered** (not when Dispatched), so a dispatched order that is refused at the door can be cancelled and its stock returns once. | Phase 1 lifecycle (pending > confirmed > processing > dispatched > shipped > delivered > returned) |
+| 2026-11-02 | **No delivery charge is ever calculated.** Checkout says "Delivery charge will be confirmed by phone"; the order total is the items total. Staff enter the agreed charge on the order (`set_order_delivery_charge()`, `0` = free); the database recalculates the total and the payment amount; it is locked once the cash is collected or the order is finished. Shipping rates and the free-delivery rule are no longer used by `place_order()` (the tables stay). | Phase 4 proposal question "how staff record the agreed delivery charge" |
+| 2026-11-02 | **Payment at launch is cash on delivery only.** The migration switches bank transfer off; bank transfer and EasyPaisa (`online`) appear at checkout only when `store_settings.bank_transfer_enabled` / `online_payment_enabled` are on. There is no payment screen, bank-account admin or proof upload yet. | Phase 4 proposal slice 2 (payments v1) |
+| 2026-11-02 | **Guest tracking links are derived, not random.** The server computes the token as HMAC-SHA256 of the checkout attempt's idempotency key under `SUPABASE_SERVICE_ROLE_KEY` and passes it to `place_order_as_guest()`, so a retry after a lost response returns the same link. The database still stores only the token's SHA-256. | Guest token "returned only by the first call" |
+| 2026-11-02 | **Owner e-mail through Resend's HTTPS API** (no SDK, no new dependency), after the response (`after()`), one per order (unique index), recipients from `store_private_settings.order_notification_emails`. Failures are recorded in `notifications` and shown on the admin order as "Owner notification not sent". | "Custom SMTP/Resend (launch checklist)" for order mail |
 
 ## Phase 1: Database
 
@@ -222,7 +242,7 @@ Open (reasoned, not fixed):
 - Low: `price_change_alert_percent` is readable by anyone (the settings table is public); the ledger-purge setting is a plain database setting, safe today because nothing can set it through the API (hardening: require trigger depth); `bodySizeLimit` of 5 MB applies to every Server Action; staff can overwrite any object in the photo bucket by calling the API directly.
 - UI (not done): visible reason beside a disabled Delete button on phones; focus return after closing inline forms; a sticky save bar on the product form; the Daily prices page is tall on a 360px phone (about 260px per row); problems table in the import report scrolls sideways on phones; no loading skeleton (a `loading.tsx` would make the 403 a 200); courier add has no pending state.
 - The e2e dev server can answer a first concurrent request slowly (cold compile); the admin tests allow 20 s for uploads.
-- `place_order()` still contains the free-shipping rule (off while the threshold is null): remove it in Phase 4.
+- ~~`place_order()` still contains the free-shipping rule~~ Removed in Phase 4.
 - Screens were reviewed in a desktop browser and from code; the phone layout of the admin was not checked visually on a device.
 
 Needs from the user:
@@ -231,23 +251,38 @@ Needs from the user:
 3. Create your admin account (and staff) as in `docs/DATABASE.md`; in Admin > Settings check the contact details, WhatsApp, the owner's order email, and have the client confirm the exchange text.
 4. Decide: should an import or the variant editor also ask for confirmation of large price changes (my suggestion: yes, in the import check report)?
 
-## Phase 4 proposal: Orders (nothing starts until you say "go")
+## Phase 4: Orders
 
-Goal: a customer can place an order (guest or signed in), the owner is told, and staff can run it to delivery. Money and stock stay authoritative in `place_order()`.
+Branch `feat/orders`. Details, migration steps, verification queries, tests and limits: `docs/ORDERS.md`.
 
-Slices:
-1. **Checkout on the database.** Replace the demo checkout with a server action that rate-limits and calls `place_order()` / `place_order_as_guest()` (service role only for the guest path, as designed); idempotency key; field-level errors from the stable error codes; order confirmation page with the order number and a tracking link for guests. Remove the free-shipping rule from `place_order()` (new migration). Delivery stays "confirmed by phone"; the order total is the items total, shipping added by staff later (needs a decision: how staff record the agreed delivery charge on an order).
-2. **Payments v1.** COD and bank transfer only (EasyPaisa/JazzCash and online gateways later). Bank accounts table and admin screen (admin only, never seeded), `get_bank_transfer_details()` on the confirmation page, payment reference/proof upload to the private bucket with server-side checks, staff verification (`set_payment_status()`).
-3. **Admin orders.** List with search and filters, order detail, status changes through `set_order_status()` (valid transitions only), internal notes, shipment with courier (from the couriers list) and tracking number, cancellation (releases stock once), returns and refunds (admin).
-4. **Notifications.** Email to the owner's private address for each new order and to the customer (order placed, shipped), through custom SMTP/Resend (launch checklist item), outbox table already exists; WhatsApp link only, no WhatsApp API.
-5. **Customer account.** Order history and detail, tracking by token, reorder.
-6. **Stock events.** Revalidate `catalog-stock` on order placement and cancellation; low-stock alert email.
+### Phase 4 report (2026-11-02)
 
-Decisions needed first: how the delivery charge is added to an order; whether guest checkout stays on; which payment methods at launch; the email provider and sender address; invoice wording (no tax lines, decided).
+Built:
+- Migration `20261102100000_orders.sql` (safe to paste twice, ends with a self-check): the workflow statuses (`contacted`, `exchange_requested`), `_order_transition_allowed()`, `place_order()` without any delivery charge or free-delivery rule (and still hiding products in hidden categories), `place_order_as_guest()` taking the server-derived tracking token, `set_order_delivery_charge()`, `set_order_shipment()`, `add_order_note()`, `mark_cod_collected()`, `search_orders()`, the customer-safe tracking summary, one owner notification per order, trigram indexes, bank transfer switched off. `schema_check.sql` now also tracks enum values and indexes (15 new objects tagged `4`).
+- Checkout on the database: contact, address (saved addresses for signed-in customers), delivery method, payment (cash on delivery only unless enabled), notes, review, Place order. Idempotency key per attempt, double-click safe, field-level errors, rate limits for guests.
+- Confirmation and tracking page `/order/<token>`; customer order history and detail `/account/orders`; admin `/admin/orders` (search, status and date filters, detail with Call and WhatsApp links, status buttons, delivery charge, courier and tracking, COD collected, internal notes, history, "owner notification not sent" warning) and the printable slip.
+- Owner e-mail through Resend over HTTPS (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`; recipients from Admin > Settings).
 
-Tests: unit (checkout schema, totals), database (place order, idempotency, cancellation releases once, permissions), Playwright (guest order, signed-in order, admin fulfils it) with the one-time session helper from 3B.
+Verified here (not on your Supabase project):
+- `npm run lint`, `npm run typecheck`, `npm run build` pass; 359 unit tests pass (new: status workflow and its match with the SQL, totals, checkout schema and payload, the place-order action, errors, owner e-mail, tracking token, audit lines, filters).
+- The migration on a local Postgres 17 (PGlite) with the real migrations: 111 behaviour checks pass (idempotent replay, price recomputation, no delivery charge, every invalid transition, cancel and delivery stock effects, exactly-once ledger, delivery charge/shipment/note/COD functions, search, tracking summary contents, anon/customer visibility, bank transfer off); the upgrade path from a project with 3A/3B, existing orders and a retired status; the generated production setup applied to an empty database (all 13 versions recorded, `schema_check.sql` returns no rows). The verification queries in `docs/ORDERS.md` were run there and their expected values copied from the output.
+- `tests/e2e/orders.spec.ts` (guest COD checkout with a double click, the tracking link, an administrator processing an order from New to Delivered with slip and print, a customer kept out of admin orders) passes on the **mobile and desktop** projects against a local stand-in for Supabase (PostgREST/GoTrue imitation on the real database; not Supabase). The stand-in lives outside the repo.
+- Review: security-reviewer (0 critical, 1 high, 1 medium, 5 low). Fixed: the medium (`contacted` counted as open by the open-order limit and the bank-transfer functions, with a self-check), the replay token echo (L1), the delivery charge now locked while a transfer awaits verification (L3), the guest phone limit keyed by phone and address (L2), a global guest ceiling (part of H1), `Cache-Control: no-store` and `X-Robots-Tag` on the tracking page (L5).
 
-Risks: double submits and stock races (covered by the database functions, to be proven under concurrency on the DEV project), email deliverability, proof-of-payment uploads, abuse of guest checkout.
+Written but **not run** against the DEV project (it needs the migration applied first): `tests/integration/db/orders.test.ts`, the updated Phase 1 DB tests (`place-order`, `rls`, helpers) and `tests/e2e/orders.spec.ts`. The Phase 1 tests were changed because behavior changed on purpose (no shipping fee at checkout, the new workflow, bank transfer off by default).
+
+Open (reasoned, not fixed):
+- **High, partly mitigated: stock hoarding by guests.** A COD order reserves stock until staff cancel it (COD orders never expire; a known Phase 1 limit), and a guest chooses the phone number freely. Limits now: 30 orders/hour per address, 6 per phone and address, 120 per hour overall, 3 open orders per phone; a determined script can still tie up stock for hours. Needed before launch: bot protection (Turnstile or hCaptcha) on guest checkout, and either an automatic cancel of stale unconfirmed guest orders (needs `pg_cron`, as for bank transfers) or a per-order share-of-stock cap. This needs a decision from you.
+- Low: partial indexes `orders_open_user_idx`, `orders_open_phone_idx`, `orders_expiry_idx` still list only pending/confirmed (performance only); `SUPABASE_SERVICE_ROLE_KEY` doubles as the HMAC key for tracking tokens (rotating it breaks existing guest links; a dedicated secret would be cleaner); `shipments.delivery_notes` and `tracking_url` are shown to guests if ever filled (nothing writes them today); staff can dispatch a COD order whose delivery charge was never entered (the screen warns, the database allows it); the tracking page may answer an unknown link with status 200 and the not-found page on a production server (the page shell streams first), with no data in it.
+- Not built, as scoped: bank transfer / EasyPaisa payment screens, bank-account admin, proofs, customer e-mail, invoices, coupons at checkout, returns/refunds screens, courier APIs, dashboard charts, wishlist, reviews.
+- The owner e-mail has never been sent to a real inbox from this code (unit-tested against a mocked `fetch` only).
+- The phone layout of the new screens was checked for sideways scrolling by the e2e test and not looked at visually.
+
+Needs from the user (exact steps in `docs/ORDERS.md`):
+1. Paste `supabase/migrations/20261102100000_orders.sql` in the dev SQL Editor, run the six verification queries and `schema_check.sql` (no rows), **then** record the version.
+2. Create a Resend account and key, add `RESEND_API_KEY` (and `RESEND_FROM_EMAIL`) to `.env.local`, enter the owner's e-mail in Admin > Settings.
+3. `npm run test:db -- tests/integration/db/orders.test.ts` (and the updated `place-order.test.ts`, `rls.test.ts`), then `npx playwright test tests/e2e/orders.spec.ts --project=desktop` (and `--project=mobile`).
+4. Decide the stock-hoarding protection above, and whether bank transfer / EasyPaisa come next.
 
 ## Launch checklist
 
@@ -258,7 +293,11 @@ Things that must be true before the site goes live. Add to this list in every ph
 - [ ] Client confirms `delivery_charge_note` and `return_policy_note` (and keeps `return_period_days` in step with the note: 7).
 - [ ] Production setup is **generated from `supabase/migrations/` in order, in one transaction that records each version inside the same file** (`npm run setup:build`; steps in `docs/PRODUCTION_SETUP.md`), ends with `supabase/checks/schema_check.sql` returning no rows and the DB tests passing. Never record a migration by hand.
 - [ ] Production: apply `20261101100000_catalog_admin.sql`; create the first admin and the staff accounts; set the owner's order-notification email and the WhatsApp number in Admin > Settings; add real products (Admin > Products or CSV) and delete the DEMO ones.
-- [ ] Remove the free-shipping rule from `place_order()` (Phase 4), now that there is no free-delivery offer.
+- [x] Remove the free-shipping rule from `place_order()` (done in Phase 4, migration `20261102100000`).
+- [ ] Orders: apply `20261102100000_orders.sql` (or the generated setup for a new project), run its verification queries, then `schema_check.sql` (no rows) and the order tests (`docs/ORDERS.md`).
+- [ ] Owner e-mail: verify the sending domain in Resend, set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the hosting environment, enter the owner's address(es) in Admin > Settings, then place a test order and confirm the e-mail arrives (it has never been sent to a real inbox from this code).
+- [ ] Decide when to turn on bank transfer / EasyPaisa: it also needs bank details, a payment screen and proof handling that do not exist yet.
+- [ ] Fix the five known failing e2e tests (list at the top of this file) before merging `feat/catalog-admin` and `feat/orders`.
 - [ ] Dashboard Auth settings: a disabled account must also be banned in Supabase Auth (Phase 6).
 - [ ] Rewrite the product names in `tests/e2e/catalog.spec.ts`, which currently assume the DEMO seed.
 - [ ] Custom SMTP for Supabase Auth emails (before the Phase 4 staging deploy).

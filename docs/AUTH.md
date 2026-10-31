@@ -60,6 +60,7 @@ These limits protect the website's own forms (server actions) only. Supabase Aut
 | Forgot password | per IP · per email + IP · per email (ceiling) | 5 / hour · 3 / hour · 10 / hour |
 | Reset password | per IP | 10 / hour |
 | Contact and quote requests (added with their pages) | per IP | 5 / hour (`contact_ip` bucket is ready) |
+| Guest checkout (Phase 4) | per IP · per phone + IP · everyone | 30 / hour · 6 / hour · 120 / hour (`checkout_ip`, `checkout_phone_ip`, `checkout_all`; the per-address limit is loose because mobile carriers share addresses) |
 
 The IP comes from `x-real-ip` / `x-forwarded-for`, which Vercel sets itself. If the site is ever self-hosted, put it behind a proxy that overwrites those headers. Values are keyed-hashed (HMAC) before they are stored, rows older than a day are purged as the limiter is used, and in production a request with no client address is refused rather than put in a shared bucket. Limits are per email **and** IP so that nobody can lock a customer out of signing in by failing on purpose from another address. Mobile carriers share addresses between many customers, so per-IP limits are deliberately loose.
 

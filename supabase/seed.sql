@@ -24,7 +24,7 @@ update public.store_settings set
   return_period_days = 7,
   guest_checkout_enabled = true,
   cod_enabled = true,
-  bank_transfer_enabled = true
+  bank_transfer_enabled = false
 where id;
 
 -- Delivery methods and DEMO shipping rates (placeholder fees; set real ones in admin)

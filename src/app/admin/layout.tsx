@@ -21,14 +21,14 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const [user, settings] = await Promise.all([requireStaff({ next: "/admin" }), getStoreSettings()]);
   const roleLabel = user.role === "admin" ? "Admin" : "Staff";
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-low">
+    <div className="flex min-h-dvh flex-col bg-surface-low print:bg-white">
       <a
         href="#main"
-        className="sr-only z-50 rounded-lg bg-card px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        className="sr-only z-50 rounded-lg bg-card px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 print:hidden"
       >
         Skip to content
       </a>
-      <header className="border-b border-border bg-card">
+      <header className="border-b border-border bg-card print:hidden">
         <div className="mx-auto flex max-w-page flex-wrap items-center justify-between gap-3 px-margin py-3 lg:px-margin-desktop">
           <Link href="/admin" className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -64,7 +64,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         </div>
       </header>
       <AdminNav isAdmin={user.role === "admin"} />
-      <main id="main" className="mx-auto w-full max-w-page flex-1 space-y-6 px-margin py-6 lg:px-margin-desktop lg:py-8">
+      <main id="main" className="mx-auto w-full max-w-page flex-1 space-y-6 px-margin py-6 lg:px-margin-desktop lg:py-8 print:max-w-none print:p-0">
         {children}
       </main>
     </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, MapPin, ShieldCheck, UserRound } from "lucide-react";
+import { LogOut, MapPin, Package, ShieldCheck, UserRound } from "lucide-react";
 import { logoutAction } from "@/features/customers/auth-actions";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ export function AccountNav({ isStaff }: { isStaff: boolean }) {
   const pathname = usePathname();
   const items = [
     { href: "/account", label: "Your details", icon: UserRound, active: pathname === "/account" },
+    { href: "/account/orders", label: "Orders", icon: Package, active: pathname.startsWith("/account/orders") },
     { href: "/account/addresses", label: "Addresses", icon: MapPin, active: pathname.startsWith("/account/addresses") },
   ];
 

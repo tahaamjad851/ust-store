@@ -34,6 +34,19 @@ const RAISED: Record<string, string> = {
   duplicate_value: "A SKU, barcode or web address in the file is already used.",
   invalid_changes: "There is nothing valid to save.",
   invalid_import: "The import is not valid.",
+  // Orders (Phase 4)
+  invalid_transition: "An order cannot move to that status from where it is now. Reload the page to see the current status.",
+  payment_required: "This order must be paid before it can be dispatched or delivered.",
+  order_not_found: "That order no longer exists. Reload the page.",
+  order_closed: "This order is already finished, so that cannot be changed.",
+  order_paid: "The payment was already collected, so the delivery charge can no longer change.",
+  invalid_amount: "Enter an amount from 0 to 100,000.",
+  courier_unavailable: "Choose a courier from the list. An admin can add couriers in Settings.",
+  invalid_tracking_number: "A tracking number can have letters, numbers, spaces and . _ / # - only.",
+  invalid_note: "Write a note of up to 2,000 characters.",
+  cod_only: "Only a cash-on-delivery order can be marked as collected.",
+  already_paid: "The payment is already marked as collected.",
+  not_dispatched: "Mark cash as collected once the order is dispatched.",
 };
 
 /** Constraint names -> what is already used. */

@@ -19,10 +19,11 @@ npm run setup:build
 It writes `supabase/setup/` (git-ignored; always rebuilt, never edited by hand) and prints:
 
 ```
-  part-1-of-4.sql                  82249 bytes  foundation, catalog, inventory, store_settings, customers, orders
-  part-2-of-4.sql                  46580 bytes  order_functions
-  part-3-of-4.sql                   4583 bytes  storage
-  part-4-of-4.sql                 113524 bytes  hardening, auth_support, catalog_public, catalog_admin + neutral seed + final schema check
+  part-1-of-5.sql                  82249 bytes  foundation, catalog, inventory, store_settings, customers, orders
+  part-2-of-5.sql                  46580 bytes  order_functions
+  part-3-of-5.sql                   4583 bytes  storage
+  part-4-of-5.sql                  67395 bytes  hardening, auth_support, catalog_public, catalog_admin
+  part-5-of-5.sql                 107774 bytes  orders (Phase 4) + neutral seed + final schema check
   optional-record-storage.sql       1925 bytes  only if the storage part failed and the policies were made by hand
   check-schema.sql                 41279 bytes  read-only: lists anything missing (no rows = complete)
   verify.sql                        5196 bytes  read-only: one row per check, all OK
@@ -37,7 +38,7 @@ If the command says `schema_check.sql was generated through …`, a migration wa
 
 ## 1. Apply the parts, in order
 
-For **each** part, in the order `part-1-of-4.sql`, `part-2-of-4.sql`, `part-3-of-4.sql`, `part-4-of-4.sql`:
+For **each** part, in the order `part-1-of-5.sql`, `part-2-of-5.sql`, `part-3-of-5.sql`, `part-4-of-5.sql`, `part-5-of-5.sql`:
 
 1. SQL Editor > **New query**. Open the file in a text editor, select **everything**, copy, paste. Do **not** type or edit anything. Make sure nothing is "selected" in the editor before you press Run (the editor runs only the highlighted text if there is a selection).
 2. **Run** once.
@@ -85,8 +86,8 @@ Both files are read-only.
 | exchange text | Exchange accepted if the product is not damaged, within 7 days. |
 | extensions pg_trgm and pgcrypto | 2 |
 | free delivery threshold (no free-delivery offer) | null |
-| latest version recorded | 20261101100000 |
-| migrations recorded | 12 |
+| latest version recorded | 20261102100000 |
+| migrations recorded | 13 |
 | orders (must be empty) | 0 |
 | price-change confirmation percent | 20 |
 | products (must be empty: no demo data) | 0 |

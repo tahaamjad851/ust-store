@@ -75,21 +75,16 @@ export async function deleteUsers() {
 }
 
 export const DELIVERY_METHOD_ID = `ust_test_${run}`;
-export const SHIPPING_PAISA = 25_000;
 let deliveryReady = false;
 
 async function ensureDeliveryMethod() {
   if (deliveryReady) return;
+  // Since Phase 4 no shipping rate is needed: the delivery charge is entered by staff after the order is placed.
   ok(await service.from("delivery_methods").insert({ id: DELIVERY_METHOD_ID, name: `UST TEST ${RUN}` }), "delivery method");
-  // free_over_paisa very high so the store-wide free-delivery threshold never applies here.
-  ok(
-    await service.from("shipping_rates").insert({ delivery_method_id: DELIVERY_METHOD_ID, fee_paisa: SHIPPING_PAISA, free_over_paisa: 9_000_000_000 }),
-    "shipping rate",
-  );
   deliveryReady = true;
 }
 
-export type Fixture = { productId: string; variantId: string; sku: string; pricePaisa: number; deliveryMethodId: string; shippingPaisa: number };
+export type Fixture = { productId: string; variantId: string; sku: string; pricePaisa: number; deliveryMethodId: string };
 
 /** A published product with one variant, opening stock (through adjust_stock as admin) and a delivery method. */
 export async function createFixture(admin: TestUser, label: string, opts: { pricePaisa: number; stock: number }): Promise<Fixture> {
@@ -132,7 +127,7 @@ export async function createFixture(admin: TestUser, label: string, opts: { pric
       "adjust_stock",
     );
   }
-  return { productId: product.id, variantId: variant.id, sku, pricePaisa: opts.pricePaisa, deliveryMethodId: DELIVERY_METHOD_ID, shippingPaisa: SHIPPING_PAISA };
+  return { productId: product.id, variantId: variant.id, sku, pricePaisa: opts.pricePaisa, deliveryMethodId: DELIVERY_METHOD_ID };
 }
 
 /** Archives fixtures so they disappear from the storefront (ordered products cannot be deleted). */

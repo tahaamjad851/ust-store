@@ -108,6 +108,7 @@ export type StoreSettingsRow = {
   announcement_text: string;
   cod_enabled: boolean;
   bank_transfer_enabled: boolean;
+  online_payment_enabled: boolean;
   delivery_charge_note: string;
   return_policy_note: string;
 };

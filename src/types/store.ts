@@ -9,7 +9,7 @@ export type DeliveryMethod = {
 };
 
 export type PaymentMethod = {
-  id: "cod" | "bank_transfer";
+  id: "cod" | "bank_transfer" | "online";
   name: string;
   description: string;
   enabled: boolean;

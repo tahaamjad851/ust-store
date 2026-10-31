@@ -232,3 +232,11 @@
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Printing (the order slip): plain black on white, no page chrome. */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+}

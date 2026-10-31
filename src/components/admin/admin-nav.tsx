@@ -7,6 +7,7 @@ import {
   Layers,
   LayoutDashboard,
   Package,
+  ShoppingBag,
   Settings,
   Tags,
   Tractor,
@@ -20,6 +21,7 @@ type Item = { href: string; label: string; icon: LucideIcon; adminOnly?: boolean
 
 const ITEMS: Item[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/prices", label: "Daily prices", icon: Wallet },
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/admin/stock", label: "Stock", icon: Warehouse },
@@ -37,7 +39,7 @@ const ITEMS: Item[] = [
 export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Admin sections" className="border-b border-border bg-card">
+    <nav aria-label="Admin sections" className="border-b border-border bg-card print:hidden">
       <ul className="mx-auto flex max-w-page gap-1 overflow-x-auto px-margin py-2 lg:px-margin-desktop">
         {ITEMS.filter((i) => isAdmin || !i.adminOnly).map(({ href, label, icon: Icon }) => {
           const current = href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(`${href}/`);

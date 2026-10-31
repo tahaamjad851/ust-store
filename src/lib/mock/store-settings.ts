@@ -42,7 +42,7 @@ export const DEMO_STORE_SETTINGS: StoreSettings = {
       id: "bank_transfer",
       name: "Bank transfer",
       description: "Bank details are shared with your order confirmation.",
-      enabled: true,
+      enabled: false,
     },
   ],
 };

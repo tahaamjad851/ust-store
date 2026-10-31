@@ -22,6 +22,13 @@ export const RATE_LIMITS = {
   reset_ip: { limit: 10, windowSeconds: 60 * 60 },
   // Contact and quote-request actions (added with their pages) use this bucket.
   contact_ip: { limit: 5, windowSeconds: 60 * 60 },
+  // Guest checkout. Mobile carriers share addresses between many customers, so the per-address ceiling is loose;
+  // the per-phone limit is the tighter one (orders for one number: a few an hour is plenty).
+  checkout_ip: { limit: 30, windowSeconds: 60 * 60 },
+  // Per phone AND address: someone else cannot use up a victim's allowance from another address.
+  checkout_phone_ip: { limit: 6, windowSeconds: 60 * 60 },
+  // A ceiling over everyone: a script spread over many addresses cannot reserve the whole catalogue in an hour.
+  checkout_all: { limit: 120, windowSeconds: 60 * 60 },
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;

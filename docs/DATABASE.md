@@ -128,25 +128,25 @@ Every product has at least one variant. A product without options has one defaul
 3. Idempotency: if an order with that key exists for the same caller **and the same request** (hash of the normalised cart, contact, address, methods, coupon, notes), return it with `replayed: true` and `tracking_token: null` (the token is only returned by the first call; the server keeps it for the session). A different request or another caller with that key gets `idempotency_key_conflict`.
 4. Anti-hoarding: refuse with `too_many_open_orders` if the account or phone already has `store_settings.max_open_orders_per_customer` (default 3) pending/confirmed orders.
 5. Lock the inventory rows `FOR UPDATE` in variant-id order, then the variant and product rows `FOR SHARE` (so prices cannot change mid-checkout), check availability, and price every line from the database.
-6. Validate the delivery method and pick the most specific active shipping rate (city → province → default).
+6. Validate the delivery method (it must be active). **No shipping rate is looked up and no delivery charge is calculated** (Phase 4): shipping starts at 0 and `orders.shipping_confirmed` is false until staff enter the agreed charge with `set_order_delivery_charge()`, which recalculates the total.
 7. Apply the coupon (locked `FOR UPDATE`): active window, minimum order, total and per-customer limits, product/category targeting (any ancestor category), percentage cap. Every coupon failure returns the same `coupon_invalid`, so codes cannot be probed.
-8. Shipping is free when the discounted subtotal reaches the rate's or the store's threshold.
+8. There is no free-delivery rule (removed in Phase 4).
 9. Allocate the order number `UST-<year>-<000001>` (counter per year, Asia/Karachi).
 10. Insert the order (with snapshots), items, stock reservations and ledger rows, status history, a payment row, and the coupon redemption.
 
-It returns `order_id`, `order_number`, totals and the `tracking_token`. Only the token's SHA-256 is stored; the raw token goes into the guest's tracking link.
+It returns `order_id`, `order_number`, totals and the `tracking_token`. Only the token's SHA-256 is stored; the raw token goes into the guest's tracking link. For guests the server derives the token from the idempotency key (HMAC under the service-role key) and passes it as `p_tracking_token`, so a retry returns the same link; `place_order_as_guest()` is executable by the service role only.
 
-Errors are raised with stable messages for the UI: `insufficient_stock` (detail has SKU and available quantity), `item_unavailable`, `invalid_items`, `invalid_phone`, `invalid_name`, `invalid_email`, `invalid_address`, `coupon_invalid`, `delivery_method_unavailable`, `no_shipping_rate`, `payment_method_unavailable`, `guest_checkout_disabled`, `too_many_open_orders`, `idempotency_key_conflict`, `account_disabled`, `not_authenticated` (also for Supabase anonymous sign-ins, which must check out as guests).
+Errors are raised with stable messages for the UI: `insufficient_stock` (detail has SKU and available quantity), `item_unavailable`, `invalid_items`, `invalid_phone`, `invalid_name`, `invalid_email`, `invalid_address`, `coupon_invalid`, `delivery_method_unavailable`, `payment_method_unavailable`, `invalid_company`, `invalid_notes`, `invalid_tracking_token`, `guest_checkout_disabled`, `too_many_open_orders`, `idempotency_key_conflict`, `account_disabled`, `not_authenticated` (also for Supabase anonymous sign-ins, which must check out as guests).
 
 ## Order lifecycle
 
 ```
-pending ──► confirmed ──► processing ──► dispatched ──► shipped ──► delivered ──► returned
-   │            │              │              └───────────────────────►┘
-   └────────────┴──────────────┴──► cancelled
+pending ─► contacted ─► confirmed ─► dispatched ─► delivered ─► exchange_requested ─► delivered
+   │           │            │             │
+   └───────────┴────────────┴─────────────┴─► cancelled          (pending can also go straight to confirmed)
 ```
 
-Changed only through `set_order_status()` (staff). Any other transition fails with `invalid_transition`. Bank-transfer and online orders must be `paid` before `processing` (`payment_required`). The note passed to `set_order_status()` is shown to the customer in their order history; put internal remarks in `internal_notes`.
+`pending` is shown to the owner as "New". `processing`, `shipped` and `returned` are retired (enum values cannot be dropped): nothing leads into them, and an order already in `processing` or `shipped` can still leave it. Changed only through `set_order_status()` (staff). Any other transition fails with `invalid_transition`. Bank-transfer and online orders must be `paid` before `dispatched` (`payment_required`). Staff also use `set_order_delivery_charge()`, `set_order_shipment()`, `add_order_note()` and `mark_cod_collected()`, each audited (`docs/ORDERS.md`). The note passed to `set_order_status()` is shown to the customer in their order history; put internal remarks in `internal_notes`.
 
 Payment status (`set_payment_status()`, staff): `unpaid → pending_verification | paid | failed`, `pending_verification → paid | failed | unpaid`, `failed → unpaid | pending_verification | paid`, `paid → refunded`. A customer's bank-transfer reference or proof (`submit_bank_transfer_reference()`) only moves the payment to `pending_verification`; staff decide `paid`.
 
@@ -159,7 +159,7 @@ Payment status (`set_payment_status()`, staff): `unpaid → pending_verification
 | Stock count correction (`adjust_stock`) | ±n | | adjustment |
 | Order placed | | +n | reserve |
 | Order cancelled (once) | | −n | release |
-| Order shipped or delivered (once) | −n | −n | sale |
+| Order delivered (once; also the retired `shipped`) | −n | −n | sale |
 
 `available = on_hand − reserved` never goes negative (`CHECK reserved <= on_hand`). Nobody updates `inventory` directly; every change writes a `stock_movements` row, and for every variant `inventory` equals the sum of its ledger. `orders.stock_state` (reserved → released or deducted) and a unique (order, variant, type) ledger index guarantee release and deduction happen at most once. Returned goods go back on the shelf with `adjust_stock(..., 'return', ...)` once inspected (moving an order to `returned` does not restock by itself).
 
@@ -186,7 +186,7 @@ select cron.schedule(
 
 ## Guest orders and tracking
 
-Guests never call the database directly. The Next.js server (Phase 4) rate-limits the request and calls `place_order_as_guest()` with the service-role client (`src/lib/supabase/admin.ts`, `server-only`). The guest gets a link containing the tracking token; the server resolves it with `get_order_by_tracking_token()` (no phone, email or full address is returned). Signed-in customers see their orders through RLS.
+Guests never call the database directly. The Next.js server rate-limits the request (Phase 4: `checkout_ip`, `checkout_phone`) and calls `place_order_as_guest()` with the service-role client (`src/lib/supabase/admin.ts`, `server-only`). The guest gets a link containing the tracking token; the server resolves it with `get_order_by_tracking_token()` (no phone, email or full address is returned). Signed-in customers see their orders through RLS.
 
 Bank details are shown only via `get_bank_transfer_details()` for an open, unpaid bank-transfer order the caller owns (or holds the token for).
 

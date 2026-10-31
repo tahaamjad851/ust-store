@@ -35,7 +35,7 @@ All of it runs in the database: `public.catalog_search()` (migration `2026103110
 | Listings, product pages | 1 min / 2 min / 15 min | `catalog`, `catalog-products`, `catalog-stock` |
 | Home page cards | 5 min / 2 min / 15 min | same |
 
-Only bounded listing shapes are cached (no free text, no price range, a tractor model that exists, the first 10 pages); a malformed product slug is refused before the cached lookup; free-text searches and the cart lookup are never cached, so made-up URLs cannot fill the cache. Since **Phase 3B** the admin actions expire the tags for what they change with `updateTag()`, so a change shows on the next request (categories → `catalog-categories`, products/variants/images/compatibility → `catalog-products`, prices and stock → `catalog-products` and `catalog-stock`, settings → `catalog-settings`). **Phase 4** order placement must revalidate `catalog-stock`; until then a stock change caused by an order shows within the lifetimes above. Money and stock stay authoritative in the database: `place_order()` re-prices and re-checks everything.
+Only bounded listing shapes are cached (no free text, no price range, a tractor model that exists, the first 10 pages); a malformed product slug is refused before the cached lookup; free-text searches and the cart lookup are never cached, so made-up URLs cannot fill the cache. Since **Phase 3B** the admin actions expire the tags for what they change with `updateTag()`, so a change shows on the next request (categories → `catalog-categories`, products/variants/images/compatibility → `catalog-products`, prices and stock → `catalog-products` and `catalog-stock`, settings → `catalog-settings`). Since **Phase 4** placing an order (`placeOrderAction`) and every order status change expire `catalog-stock` and `catalog-products` too, so a sold-out or restocked product shows at once. Money and stock stay authoritative in the database: `place_order()` re-prices and re-checks everything.
 
 Product and category pages are prerendered for what exists at build time (the 48 newest products, every category) and rendered on first visit for the rest. An unknown or deactivated URL shows the not-found page with `noindex`; the status is 404 (the first request to a URL that was never generated may be answered 200 by a production server, because the page shell streams first).
 
@@ -47,7 +47,7 @@ Category images (`categories.image_path`) have no bucket yet; only a shipped `/i
 
 ### Cart
 
-Browser only (`localStorage` key `ust-cart-v2`): `[{ variant_id, quantity }]` and nothing else. The cart and checkout pages send the variant ids to a Server Action (`lookupCartItems`), which returns name, image, price and stock status from the database; unknown or no-longer-sold variants are dropped from the cart, out-of-stock lines stay visible but are left out of the total and block "Proceed to checkout". Checkout is still the DEMO path (nothing is sent) until Phase 4.
+Browser only (`localStorage` key `ust-cart-v2`): `[{ variant_id, quantity }]` and nothing else. The cart and checkout pages send the variant ids to a Server Action (`lookupCartItems`), which returns name, image, price and stock status from the database; unknown or no-longer-sold variants are dropped from the cart, out-of-stock lines stay visible but are left out of the total and block "Proceed to checkout". Checkout places real orders since Phase 4 (`docs/ORDERS.md`).
 
 Delivery is never calculated on public pages, and there is no free-delivery offer. Product page, cart and checkout show `store_settings.delivery_charge_note`; the product page and FAQ show `store_settings.return_policy_note` (since 3B: "Exchange accepted if the product is not damaged, within 7 days.", to be confirmed by the client). The top bar shows `store_settings.announcement_text`. All three are edited in **Admin > Settings**.
 
@@ -300,4 +300,4 @@ The admin tests do **not** use the login form. A setup project (`tests/e2e/admin
 - Creating a product and its first variant is two database calls. If the second fails the product stays as a draft and the page says so (a staff member cannot delete the draft; an admin can).
 - CSV does not cover specifications, tractor compatibility or photos.
 - Category and brand images and logos are not part of 3B.
-- `place_order()` still contains the free-shipping rule. It stays off because the threshold is null and no screen can set it; remove the rule in Phase 4.
+- ~~`place_order()` still contains the free-shipping rule.~~ Removed in Phase 4 (migration `20261102100000`): `place_order()` calculates no delivery charge at all.

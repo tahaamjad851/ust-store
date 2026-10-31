@@ -75,7 +75,7 @@ describe("customers are isolated from each other", () => {
     expect(res.data ?? []).toEqual([]);
     const { data } = await service.from("orders").select("total_paisa, status, payment_status").eq("id", aliceOrderId).single();
     expect(data).toMatchObject({ status: "pending", payment_status: "unpaid" });
-    expect(Number(data?.total_paisa)).toBe(fx.pricePaisa + fx.shippingPaisa);
+    expect(Number(data?.total_paisa)).toBe(fx.pricePaisa);
   });
 });
 

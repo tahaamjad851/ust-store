@@ -291,6 +291,7 @@ export function fitmentLabel(rows: Pick<CompatibilityRow, "tractor_model_id">[],
 const PAYMENT_COPY = {
   cod: { name: "Cash on delivery", description: "Pay when you receive your order." },
   bank_transfer: { name: "Bank transfer", description: "Bank details are shared with your order confirmation." },
+  online: { name: "EasyPaisa", description: "We will confirm the payment details with you by phone." },
 } as const;
 
 export function mapStoreSettings(row: PublicSettingsRow, deliveryMethods: PublicDeliveryRow[]): StoreSettings {
@@ -315,6 +316,7 @@ export function mapStoreSettings(row: PublicSettingsRow, deliveryMethods: Public
     payment_methods: [
       { id: "cod", ...PAYMENT_COPY.cod, enabled: row.cod_enabled },
       { id: "bank_transfer", ...PAYMENT_COPY.bank_transfer, enabled: row.bank_transfer_enabled },
+      { id: "online", ...PAYMENT_COPY.online, enabled: row.online_payment_enabled },
     ],
   };
 }

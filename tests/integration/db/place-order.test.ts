@@ -105,8 +105,9 @@ describe("prices are recomputed on the server", () => {
       );
       expect(res.error).toBeNull();
       expect(res.data.subtotal_paisa).toBe(123_400 * 3);
-      expect(res.data.shipping_paisa).toBe(fx.shippingPaisa);
-      expect(res.data.total_paisa).toBe(123_400 * 3 + fx.shippingPaisa);
+      // Phase 4: no delivery charge at checkout; staff enter it later.
+      expect(res.data.shipping_paisa).toBe(0);
+      expect(res.data.total_paisa).toBe(123_400 * 3);
 
       const { data: items } = await service
         .from("order_items")
@@ -178,18 +179,20 @@ describe("stock lifecycle", () => {
       expect(await inventoryOf(fx.variantId)).toEqual({ on_hand: 5, reserved: 0 });
     }));
 
-  it("shipping converts the reservation into a deduction", () =>
+  it("delivery converts the reservation into a deduction", () =>
     uncapped(async () => {
       const fx = await createFixture(admin, "ship", { pricePaisa: 10_000, stock: 5 });
       const res = await shoppers[4].client.rpc("place_order", orderArgs(fx, [{ variant_id: fx.variantId, quantity: 2 }]));
-      for (const status of ["confirmed", "processing", "dispatched", "shipped"]) {
+      for (const status of ["confirmed", "dispatched", "delivered"]) {
         const r = await admin.client.rpc("set_order_status", { p_order_id: res.data.order_id, p_status: status });
         expect(r.error, status).toBeNull();
       }
       expect(await inventoryOf(fx.variantId)).toEqual({ on_hand: 3, reserved: 0 });
     }));
 
+  // Bank transfer is off by default since Phase 4 (store_settings.bank_transfer_enabled), so the test switches it on and restores it.
   it("unpaid bank transfers past their hold are cancelled and their stock released", () =>
+    withSetting("bank_transfer_enabled", true, () =>
     uncapped(async () => {
       const fx = await createFixture(admin, "expire", { pricePaisa: 10_000, stock: 5 });
       const res = await shoppers[5].client.rpc(
@@ -203,5 +206,5 @@ describe("stock lifecycle", () => {
       const { data } = await service.from("orders").select("status, stock_state").eq("id", res.data.order_id).single();
       expect(data).toEqual({ status: "cancelled", stock_state: "released" });
       expect(await inventoryOf(fx.variantId)).toEqual({ on_hand: 5, reserved: 0 });
-    }));
+    })));
 });

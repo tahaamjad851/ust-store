@@ -331,6 +331,7 @@ describe("mapStoreSettings", () => {
     announcement_text: "Open today",
     cod_enabled: true,
     bank_transfer_enabled: false,
+    online_payment_enabled: false,
     delivery_charge_note: "Delivery charge confirmed by phone",
     return_policy_note: "Exchange within 7 days if the product is in original condition.",
   };
@@ -348,7 +349,10 @@ describe("mapStoreSettings", () => {
 
   it("enables payment methods from the flags, and carries no fee", () => {
     const s = mapStoreSettings(row, []);
-    expect(s.payment_methods.map((m) => [m.id, m.enabled])).toEqual([["cod", true], ["bank_transfer", false]]);
+    expect(s.payment_methods.map((m) => [m.id, m.enabled])).toEqual([["cod", true], ["bank_transfer", false], ["online", false]]);
+    // Switched on in the settings, a method is offered; the others stay off.
+    const withOnline = mapStoreSettings({ ...row, online_payment_enabled: true }, []);
+    expect(withOnline.payment_methods.filter((m) => m.enabled).map((m) => m.id)).toEqual(["cod", "online"]);
     expect(JSON.stringify(s)).not.toMatch(/fee_paisa/);
   });
 });
