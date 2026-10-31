@@ -762,7 +762,8 @@ begin
       select id, product_id into v_vid, v_owner from public.product_variants where sku = vr ->> 'sku' for update;
       if found then
         if v_owner <> v_pid then
-          raise exception 'sku_belongs_to_other_product' using errcode = '23505', detail = vr ->> 'sku';
+          -- Not 23505: the handler at the end turns every unique violation into duplicate_value, which would hide this reason.
+          raise exception 'sku_belongs_to_other_product' using errcode = 'P0001', detail = vr ->> 'sku';
         end if;
         v_variants_updated := v_variants_updated + 1;
       else
@@ -872,6 +873,7 @@ $$;
 do $$
 declare
   f record;
+  v_bad text := '';
 begin
   for f in
     select p.oid::regprocedure as sig, r.rolname
@@ -892,8 +894,12 @@ begin
                       'set_primary_image']
          end)
   loop
-    raise exception '% can execute %, which is not in the allowlist', f.rolname, f.sig;
+    v_bad := v_bad || format(E'
+  %s can execute %s', f.rolname, f.sig);
   end loop;
+  if v_bad <> '' then
+    raise exception 'these functions are executable by anon or authenticated but are not in the allowlist:%', v_bad;
+  end if;
 
   if has_table_privilege('anon', 'public.price_changes', 'select')
      or has_table_privilege('anon', 'public.couriers', 'select')

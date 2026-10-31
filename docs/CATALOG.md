@@ -87,8 +87,8 @@ select version, name from supabase_migrations.schema_migrations order by version
 -- 20261031100000 | catalog_public   then   20261030100000 | auth_support
 
 set role anon;
-select count(*) from public.catalog_search();                       -- 23 with the DEMO seed
-select count(*) from public.catalog_search('clutch plate');         -- a few
+select count(*) from public.catalog_search(p_limit => 48);          -- 23 with the DEMO seed (a page is 12 rows by default)
+select count(*) from public.catalog_search('clutch plate', p_limit => 48);  -- a few
 select count(*) from public.product_variant_costs;                  -- ERROR: permission denied (that is the point)
 reset role;
 ```
@@ -179,6 +179,8 @@ Each admin action declares what it touches and expires the matching tags with `u
 
 File: `supabase/migrations/20261101100000_catalog_admin.sql`. Run it **once**.
 
+**Before this, make sure 3A is really applied** on the project: run `supabase/checks/schema_check.sql` (only `since = 3b` rows may appear). If rows with `since = 3a` appear, follow "If 3A is recorded but missing" below first.
+
 1. Supabase dashboard (**dev** project) > **SQL Editor** > New query. Paste the whole file > **Run**. Expect `Success. No rows returned`. It ends with a self-check that raises an error (and rolls everything back) if anon or a customer can execute an unexpected function, if anon can read costs, price history, couriers or inventory, or if a free-delivery threshold is still set.
 2. New query (separate), record it:
 
@@ -210,6 +212,75 @@ select version, name from supabase_migrations.schema_migrations order by version
 The last `select` before `reset role` must fail; run `reset role;` afterwards in any case. To bring the DEMO data in line (top bar text, WhatsApp 0321 8219594) either edit them in **Admin > Settings** or re-run the seed on the dev project only.
 
 First admin and staff accounts: `docs/DATABASE.md`.
+
+## If 3A is recorded but missing (the 3A repair)
+
+**What happened on one dev project.** `schema_migrations` listed `20261031100000 catalog_public`, but `store_settings` had no `delivery_charge_note` / `return_policy_note` and `catalog_search()` did not exist, so Phase 3B failed with `42703: column "return_policy_note" of relation "store_settings" does not exist`. `stock_availability()` *did* exist, but that is the Phase 1 version (it returns a quantity); it is not evidence that 3A partly applied. The SQL Editor runs a pasted script as one transaction, so a script either applies completely or not at all. The record in `schema_migrations` is a **separate** statement that is run by hand, and nothing stops it being run after a script that failed or never ran. The likeliest reasons the 3A script did not take effect: the script's own final check raised an error (it fails loudly if anon or a customer can run a function outside the allowlist, and rolls everything back), another statement failed, only part of the text was selected when running, or it was not run at all. Which one is not knowable from the project afterwards; the repair prints the real reason if there is one.
+
+Repair file: `supabase/migrations/20261031100100_catalog_public_repair.sql`. Its version sorts **after** 3A and **before** 3B, so the order everywhere is `…100000` (3A), `…100100` (repair), `20261101100000` (3B). On a project where 3A is complete it changes nothing that matters; on a broken one it creates what is missing: the two columns (`add column if not exists`, an existing text is kept), `stock_availability()` (only if it is missing or still the quantity-returning Phase 1 version) and `catalog_search()` (only if missing), repeats their grants, and ends with the same check as 3A, listing **every** offending function at once. It can be run again at any time, including after 3B, without replacing 3B's newer `stock_availability()`.
+
+### Steps (dev project, SQL Editor)
+
+1. **Look first (read-only).** New query:
+
+```sql
+select pg_get_function_result('public.stock_availability(uuid[])'::regprocedure);
+-- TABLE(variant_id uuid, available integer, status text)  = the Phase 1 version: 3A never took effect
+```
+
+   Then paste `supabase/checks/schema_check.sql` and run it. It lists everything the migrations should have created and this project lacks (rows with `since = 3b` are expected until 3B is applied). If it shows missing objects from **other** migrations than 3A, stop and tell me before going on: the same "recorded but not applied" problem would be wider.
+
+2. **Run the repair.** New query: paste the whole file `20261031100100_catalog_public_repair.sql` and **Run once**. Expect `Success. No rows returned`. If it errors, copy the full message to me; it names the cause (for example the functions anon can run that it should not).
+
+3. **Record it** (a separate query, only after step 2 succeeded):
+
+```sql
+insert into supabase_migrations.schema_migrations (version, name)
+values ('20261031100100', 'catalog_public_repair')
+on conflict (version) do nothing;
+```
+
+4. **Verify 3A** (each in its own query, or one after the other):
+
+```sql
+-- both texts exist, with their 3A values
+select delivery_charge_note, return_policy_note from public.store_settings;
+-- Delivery charge confirmed by phone | Exchange within 7 days if the product is in original condition.
+
+-- the two functions, their result shape and the anon grant
+select p.proname, pg_get_function_result(p.oid) as returns, has_function_privilege('anon', p.oid, 'execute') as anon_can_execute
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname in ('catalog_search', 'stock_availability') order by 1;
+-- catalog_search     | TABLE(product_id uuid, variant_id uuid, stock_status text, total_count bigint) | true
+-- stock_availability | TABLE(variant_id uuid, status text)                                           | true
+
+-- anon can search (a page is at most 12 rows unless p_limit is given), and cannot read costs or inventory
+set role anon;
+select count(*) from public.catalog_search(p_limit => 48);      -- 23 with the DEMO seed
+select count(*) from public.product_variant_costs;              -- ERROR: permission denied (that is the point)
+reset role;
+```
+
+   The `product_variant_costs` select must fail; run `reset role;` afterwards in any case. Then tell PostgREST about the new objects: `notify pgrst, 'reload schema';` and run `schema_check.sql` again: only `since = 3b` rows may remain.
+
+5. **Run the 3A tests** (this is the first time they prove the privacy of 3A on the real project): `npm run test:db -- tests/integration/db/catalog-public.test.ts`. Note: this file now also expects the 3B column `store_settings.announcement_text`, so run it **after** step 6, or expect its first check to list that column as missing.
+
+6. **Apply 3B**: paste `20261101100000_catalog_admin.sql`, **Run once**, then record it in a separate query and verify (see "Applying the 3B migration" above). Then `schema_check.sql` must return **no rows**, and `npm run test:db` for `catalog-public.test.ts` and `catalog-admin.test.ts` must pass.
+
+### The tests now check the project first
+
+`tests/integration/db/catalog-public.test.ts` and `catalog-admin.test.ts` start with `assertProjectHas()` (`helpers.ts`): it asks the project whether every column and function the file needs exists and fails once, with a list of everything missing and the migrations that create it, before any fixture is created. `supabase/checks/schema_check.sql` is the same idea for the whole schema (713 objects), generated from the migrations; regenerate it when a migration is added.
+
+## Production setup: how to avoid this
+
+The cause was not the migration text; it was **applying by hand and recording by hand**. For production:
+
+1. **Never record a migration separately from applying it.** Preferred: `supabase db push` from a machine that can reach the database (a laptop on another network, or CI). It runs each file and records its version only if the file succeeded, and it stops at the first error.
+2. If the SQL Editor has to be used, the setup file must be **generated from `supabase/migrations/` in order** (never hand-assembled or hand-edited), start with `begin;`, contain each migration followed by its own `insert into supabase_migrations.schema_migrations …` **inside the same file**, and end with `commit;`. One transaction means the first error rolls back everything and **records nothing**, so a project can never say "applied" about something that is not there. If a statement cannot run inside a transaction on the hosted project (for example the storage policies that need table ownership, see `docs/DATABASE.md`), split the file at that statement and give that part its own generated file, with the same rules.
+3. **End every setup with the checks**, as the last thing: `supabase/checks/schema_check.sql` must return no rows; then run the database tests against the project (`npm run test:db`, which now begins by listing anything missing). A production release is not done until both are clean.
+4. Do not run the seed on production, and do not paste a migration from chat or from an old copy: always from the committed file at the release commit.
+
+The generator for these setup files (`scripts/build-setup-sql.mjs`, with the transaction and the recording built in) is **not built yet**; it is part of the production preparation and will be tested against the same local Postgres before it is used on any project.
 
 ## Tests (3B)
 

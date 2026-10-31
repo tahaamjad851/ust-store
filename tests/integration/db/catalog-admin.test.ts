@@ -4,7 +4,7 @@
 // need a confirmation, and an import is all-or-nothing.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { anon, archiveFixtures, createFixture, createUser, deleteUsers, orderArgs, RUN, service, type Fixture, type TestUser } from "./helpers";
+import { anon, archiveFixtures, assertProjectHas, createFixture, createUser, deleteUsers, orderArgs, RUN, service, type Fixture, type TestUser } from "./helpers";
 
 let admin: TestUser;
 let staff: TestUser;
@@ -14,6 +14,28 @@ let orderedFx: Fixture;
 const run = RUN.toLowerCase();
 
 beforeAll(async () => {
+  // First: does this project have what the file needs? One clear message instead of a failure mid-fixture.
+  await assertProjectHas({
+    columns: {
+      store_settings: ["delivery_charge_note", "return_policy_note", "announcement_text", "price_change_alert_percent"],
+      price_changes: ["variant_id", "old_regular_paisa", "new_regular_paisa", "changed_by", "source", "batch_id"],
+      couriers: ["name", "sort_order", "is_active"],
+      product_variant_costs: ["variant_id", "cost_paisa"],
+      product_images: ["storage_path", "is_primary", "alt_text", "sort_order"],
+    },
+    functions: [
+      { name: "catalog_search", args: { p_limit: 1 } },
+      { name: "stock_availability", args: { p_variant_ids: [] } },
+      { name: "category_is_public", args: { p_category_id: "00000000-0000-0000-0000-000000000000" } },
+      { name: "apply_daily_changes", args: { p_changes: [] } },
+      { name: "import_catalog", args: { p_products: [] } },
+      { name: "catalog_reorder", args: { p_entity: "categories", p_ids: [] } },
+      { name: "set_primary_image", args: { p_image_id: "00000000-0000-0000-0000-000000000000" } },
+      { name: "adjust_stock", args: { p_variant_id: "00000000-0000-0000-0000-000000000000", p_on_hand_delta: 1, p_movement_type: "receive", p_reason: "probe" } },
+      { name: "set_stock_thresholds", args: { p_variant_id: "00000000-0000-0000-0000-000000000000", p_low_stock_threshold: 1, p_reorder_level: null } },
+    ],
+    migrations: ["20261031100000_catalog_public.sql", "20261031100100_catalog_public_repair.sql", "20261101100000_catalog_admin.sql"],
+  });
   admin = await createUser("cadmin-admin", "admin");
   staff = await createUser("cadmin-staff", "staff");
   customer = await createUser("cadmin-customer");
@@ -58,7 +80,7 @@ describe("every admin write is refused for anon and customers", () => {
     await customer.client.from("products").update({ name: "HACKED" }).eq("id", fx.productId);
     await customer.client.from("product_variants").update({ regular_price_paisa: 1 }).eq("id", fx.variantId);
     await customer.client.from("products").delete().eq("id", fx.productId);
-    const { data } = await service.from("product_variants").select("regular_price_paisa, products(name)").eq("id", fx.variantId).single();
+    const { data } = await service.from("product_variants").select("regular_price_paisa").eq("id", fx.variantId).single();
     expect(Number(data?.regular_price_paisa)).toBe(100_000);
   });
 

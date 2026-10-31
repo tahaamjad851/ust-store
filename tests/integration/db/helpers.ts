@@ -174,3 +174,42 @@ export function orderArgs(fx: Fixture, items: unknown[], overrides: Record<strin
 export async function inventoryOf(variantId: string) {
   return must(await service.from("inventory").select("on_hand, reserved").eq("variant_id", variantId).single(), "inventory");
 }
+
+export type ProjectNeeds = {
+  /** table -> columns that must exist */
+  columns?: Record<string, string[]>;
+  /** functions that must exist, with arguments that make the call harmless (it is expected to refuse or return nothing) */
+  functions?: { name: string; args: Record<string, unknown> }[];
+  /** the migration(s) that create these objects, for the message */
+  migrations: string[];
+};
+
+/**
+ * Runs FIRST in a test file's beforeAll. Asks the project whether every column and function the file relies
+ * on exists, and fails with ONE message that lists everything missing, instead of a confusing error from the
+ * middle of a fixture. A migration can be recorded in schema_migrations without having been applied (the
+ * record is a separate statement), so the list of applied migrations is not proof; this asks the objects.
+ */
+export async function assertProjectHas(needs: ProjectNeeds) {
+  const missing: string[] = [];
+  for (const [table, columns] of Object.entries(needs.columns ?? {})) {
+    for (const column of columns) {
+      const res = await service.from(table).select(column).limit(1);
+      if (res.error) missing.push(`column ${table}.${column} (${res.error.code ?? "no code"}: ${res.error.message})`);
+    }
+  }
+  for (const fn of needs.functions ?? []) {
+    const res = await service.rpc(fn.name, fn.args);
+    // PGRST202: no function with that name and argument names. Any other answer (even a refusal) means it exists.
+    if (res.error?.code === "PGRST202" || res.error?.code === "42883") missing.push(`function ${fn.name}(${Object.keys(fn.args).join(", ")})`);
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `This project is missing ${missing.length} object(s) that these tests need:\n  - ${missing.join("\n  - ")}\n` +
+        `Expected from: ${needs.migrations.join(", ")}.\n` +
+        `A migration can be listed in supabase_migrations.schema_migrations without having been applied. Run ` +
+        `supabase/checks/schema_check.sql in the SQL Editor to see exactly what is missing, apply the migration(s) ` +
+        `(docs/CATALOG.md), and if you just applied one, run: notify pgrst, 'reload schema';`,
+    );
+  }
+}

@@ -4,7 +4,7 @@
 // 20261031100000_catalog_public.sql applied. Run with `npm run test:db`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PUBLIC_TABLE_COLUMNS } from "@/features/catalog/columns";
-import { anon, archiveFixtures, createUser, deleteUsers, RUN, service, type TestUser } from "./helpers";
+import { anon, archiveFixtures, assertProjectHas, createUser, deleteUsers, RUN, service, type TestUser } from "./helpers";
 
 const run = RUN.toLowerCase();
 type Row = Record<string, unknown>;
@@ -109,6 +109,19 @@ const labelsOf = (hits: { product_id: string }[]) =>
     .sort();
 
 beforeAll(async () => {
+  // First: does this project have what the file needs? One clear message instead of a failure mid-fixture.
+  await assertProjectHas({
+    columns: Object.fromEntries(Object.entries(PUBLIC_TABLE_COLUMNS).map(([table, list]) => [table, list.split(",")])),
+    functions: [
+      { name: "catalog_search", args: { p_limit: 1 } },
+      { name: "stock_availability", args: { p_variant_ids: [] } },
+    ],
+    migrations: [
+      "20261031100000_catalog_public.sql",
+      "20261031100100_catalog_public_repair.sql (if 3A was recorded but not applied)",
+      "20261101100000_catalog_admin.sql (adds store_settings.announcement_text, which the storefront reads)",
+    ],
+  });
   admin = await createUser("catalog-admin", "admin");
   parentCategory = must(await service.from("categories").insert({ slug: `ust-cat-${run}`, name: `UST TEST ${RUN} parent` }).select("id").single(), "parent category").id;
   childCategory = must(
