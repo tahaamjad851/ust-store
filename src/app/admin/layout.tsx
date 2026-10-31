@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogOut, Store, Tractor } from "lucide-react";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/features/customers/auth-actions";
@@ -62,7 +63,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           </div>
         </div>
       </header>
-      <main id="main" className="mx-auto w-full max-w-page flex-1 px-margin py-8 lg:px-margin-desktop">
+      <AdminNav isAdmin={user.role === "admin"} />
+      <main id="main" className="mx-auto w-full max-w-page flex-1 space-y-6 px-margin py-6 lg:px-margin-desktop lg:py-8">
         {children}
       </main>
     </div>
