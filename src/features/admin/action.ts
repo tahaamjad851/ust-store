@@ -17,25 +17,12 @@ import { revalidatePath, updateTag } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
-import { CATALOG_TAGS } from "@/features/catalog/cache";
+import { PUBLIC_TAGS } from "@/features/catalog/cache";
 import { requireAdmin, requireStaff, type SessionUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { fieldErrorsFrom } from "@/lib/validation/form";
 import { describeDbError, type DbErrorLike } from "./db-errors";
 import type { AdminResult } from "./types";
-
-/**
- * What a change touches on the public site. A change to a category or a tractor model decides what is
- * visible, so it also expires the product listings; stock and price changes expire the product caches
- * (every cached product entry carries both tags).
- */
-const PUBLIC_TAGS = {
-  categories: [CATALOG_TAGS.categories, CATALOG_TAGS.products],
-  tractors: [CATALOG_TAGS.tractors, CATALOG_TAGS.products],
-  products: [CATALOG_TAGS.products, CATALOG_TAGS.stock],
-  stock: [CATALOG_TAGS.stock, CATALOG_TAGS.products],
-  settings: [CATALOG_TAGS.settings],
-} as const;
 
 export type PublicArea = keyof typeof PUBLIC_TAGS;
 

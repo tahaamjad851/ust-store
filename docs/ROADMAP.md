@@ -284,10 +284,23 @@ Needs from the user (exact steps in `docs/ORDERS.md`):
 3. `npm run test:db -- tests/integration/db/orders.test.ts` (and the updated `place-order.test.ts`, `rls.test.ts`), then `npx playwright test tests/e2e/orders.spec.ts --project=desktop` (and `--project=mobile`).
 4. Decide the stock-hoarding protection above, and whether bank transfer / EasyPaisa come next.
 
+## Real-data pass on the public site (branch feat/orders, 2026-11-01)
+
+The public site shows only data from the database; a part with nothing to show is left out, not shown empty. Owner steps: `docs/CLIENT_GUIDE.md`.
+
+- Removed: the six "Brand 1..6" placeholder tiles (the home page now lists the active brands that have a published product, names only), the hardcoded category slugs on the home page (it shows a row for each of the first three categories that have products), the unbacked "Popular" heading, and the "wholesale pricing" wording (one retail price for everyone; bulk buyers ask for a quote on WhatsApp).
+- Categories with no products are hidden from the menus, home page, footer, drawer and filters (count asked of `catalog_search`, tagged so publishing the first product shows the category at once). A direct link to an empty category still opens, with a clear message.
+- Empty store: home, shop, category and search render a plain message (no filters, no "0 products", no empty headings). New project with blank settings: no dead `wa.me` / `tel:` links, no empty address rows, no empty top bar.
+- Kept on purpose: the "Demo catalogue" banner (`DEMO_CATALOG_NOTICE=off` at launch), the shipped "Image coming soon" drawings for products without a photo, and "Delivery" wording derived from the delivery methods.
+- Checked, no code change needed: no ratings, reviews, sold counts, "Best seller"/"New" badges or stock photos exist. The only badge is "-N%", shown only when a sale price is lower than the regular price.
+- Cache: every admin save expires the tags of the cached readers it affects (`PUBLIC_TAGS` in `features/catalog/cache.ts`); `tests/unit/cache-invalidation.test.ts` fails if a cached reader is added without a tag that an admin save expires.
+- Gap found: no migration creates a **delivery method** and the admin has no screen for them, so a production project cannot take orders until one is inserted (`docs/PRODUCTION_SETUP.md`, step 5b).
+
 ## Launch checklist
 
 Things that must be true before the site goes live. Add to this list in every phase.
 
+- [ ] **Create the delivery methods** on production (`docs/PRODUCTION_SETUP.md`, step 5b); checkout cannot place an order without one.
 - [ ] **Remove the DEMO catalog.** Archive or delete the DEMO products, categories, tractor models and compatibility rows (`docs/DATABASE.md`, "Removing demo data"; with 3B, from the admin). Set `DEMO_CATALOG_NOTICE=off` so the "Demo catalogue" notice disappears. Delete `src/lib/mock/`, `scripts/generate-seed.mjs`, `supabase/seed.sql` and the `db:seed:generate` script. Never run `db push --include-seed` against production.
 - [ ] Replace the DEMO contact details, hours and tagline in `store_settings` with the client's confirmed values (Admin > Settings). There is no free-delivery offer (threshold is null).
 - [ ] Client confirms `delivery_charge_note` and `return_policy_note` (and keeps `return_period_days` in step with the note: 7).

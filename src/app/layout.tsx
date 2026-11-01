@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 // next/font downloads these at build time and serves them from our own origin (font-src 'self').
 import { Inter, Work_Sans } from "next/font/google";
+import { joinSentences } from "@/lib/store-text";
 import { getStoreSettings } from "@/services/catalog";
 import "./globals.css";
 
@@ -21,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getStoreSettings();
   return {
     title: { default: settings.business_name, template: `%s | ${settings.business_name}` },
-    description: `${settings.tagline}. ${settings.value_statement}.`,
+    description: joinSentences(settings.tagline, settings.value_statement) || undefined,
   };
 }
 

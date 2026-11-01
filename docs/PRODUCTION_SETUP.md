@@ -148,6 +148,20 @@ No account, password or role is in any migration.
 2. SQL Editor: open `first-admin.sql`, replace `REPLACE-WITH-YOUR-EMAIL@example.com` with that email (keep the quotes), paste, Run. It stops with an error if the email is still the placeholder or no such account exists. Expect **one row: your email and `admin`**.
 3. After the site is deployed: sign in at `/login`, then open `/admin`. Staff accounts are added the same way with `'staff'` in place of `'admin'` (see `docs/DATABASE.md`).
 
+## 5b. Delivery methods (once)
+
+No migration creates a delivery method, and there is no admin screen for them: checkout needs at least one, and without it a customer cannot place an order. Run this once in the SQL Editor, with the names and wording the client confirmed (these are examples; change them before you run it). Expect "Success. No rows returned", then the select shows the rows.
+
+```sql
+insert into public.delivery_methods (id, name, description, is_pickup, sort_order) values
+  ('courier', 'Doorstep courier', 'Delivered to your address by courier.', false, 1),
+  ('cargo_terminal', 'Cargo terminal pickup', 'Sent by goods transport to the terminal in your city. You collect it there.', true, 2)
+on conflict (id) do nothing;
+select id, name, is_pickup, is_active from public.delivery_methods order by sort_order;
+```
+
+To change one later, `update public.delivery_methods set name = '...' where id = 'courier';` and then save any value in Admin > Settings (or wait up to 15 minutes) so the shop refreshes.
+
 ## 6. First steps in the admin
 
 1. **Settings**: business name, phones, WhatsApp number (typed like 0321 8219594), address, opening hours, the top bar text, the delivery note, the exchange text (the client confirms it), the private email for new orders.

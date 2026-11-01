@@ -27,6 +27,7 @@ import {
 } from "@/features/catalog/columns";
 import { CACHE_FEATURED, CACHE_PRODUCTS, CACHE_STATIC, CATALOG_TAGS } from "@/features/catalog/cache";
 import { PAGE_SIZE, searchArgs, type ListingParams } from "@/features/catalog/listing";
+import { buildCategoryTree, withProducts, type CategoryCounts, type CategoryNode } from "@/features/catalog/visibility";
 import {
   fitmentLabel,
   mapCartItem,
@@ -53,7 +54,7 @@ import type {
 import type { StoreSettings } from "@/types/store";
 
 export type { CartCatalogItem } from "@/types/catalog";
-export type CategoryNode = Category & { children: Category[] };
+export type { CategoryNode } from "@/features/catalog/visibility";
 export type ProductCards = { items: Product[]; fitmentLabels: Record<string, string> };
 
 type Db = ReturnType<typeof createPublicClient>;
@@ -115,11 +116,35 @@ async function getVisibleCategories(): Promise<Category[]> {
   return visible;
 }
 
+/**
+ * Visible products per category, descendants included. Asked of catalog_search() itself, so a category is hidden
+ * exactly when its own page would list nothing. Tagged with the product tags too: publishing the first product of
+ * a category must make the category appear at once. If one count cannot be read the category is left out of the
+ * result, which shows it (fail open: a hiccup must not make a category vanish from the menu).
+ */
+async function getCategoryCounts(): Promise<CategoryCounts> {
+  "use cache";
+  cacheLife(CACHE_FEATURED);
+  cacheTag(CATALOG_TAGS.all, CATALOG_TAGS.categories, CATALOG_TAGS.products);
+  const categories = await getVisibleCategories();
+  const db = createPublicClient();
+  const entries = await Promise.all(
+    categories.map(async (c): Promise<[string, number] | null> => {
+      const res = await db.rpc("catalog_search", { p_category_id: c.id, p_sort: "relevance", p_limit: 1, p_offset: 0 });
+      if (res.error) {
+        console.error(`catalog: product count of a category failed (${res.error.code ?? "no code"}): ${res.error.message}`);
+        return null;
+      }
+      return [c.id, res.data && res.data.length > 0 ? Number(res.data[0].total_count) : 0];
+    }),
+  );
+  return Object.fromEntries(entries.flatMap((e) => (e ? [e] : [])));
+}
+
+/** The categories the public shop lists: those with at least one product, each with its non-empty subcategories. */
 export async function getCategoryTree(): Promise<CategoryNode[]> {
-  const all = await getVisibleCategories();
-  return all
-    .filter((c) => c.parent_id === null)
-    .map((c) => ({ ...c, children: all.filter((s) => s.parent_id === c.id) }));
+  const [all, counts] = await Promise.all([getVisibleCategories(), getCategoryCounts()]);
+  return buildCategoryTree(all, counts);
 }
 
 export async function getCategoryBySlug(slug: string, parentId: string | null = null): Promise<Category | null> {
@@ -127,8 +152,37 @@ export async function getCategoryBySlug(slug: string, parentId: string | null = 
   return all.find((c) => c.slug === slug && c.parent_id === parentId) ?? null;
 }
 
+/** Subcategories of a category that have products. */
 export async function getChildCategories(parentId: string): Promise<Category[]> {
-  return (await getVisibleCategories()).filter((c) => c.parent_id === parentId);
+  const [all, counts] = await Promise.all([getVisibleCategories(), getCategoryCounts()]);
+  return withProducts(all.filter((c) => c.parent_id === parentId), counts);
+}
+
+/**
+ * Names of the active brands that have at least one published product, for the home page. Brands have no logo
+ * column, so these are names only. Empty when no product has a brand.
+ */
+export async function getStockedBrands(): Promise<string[]> {
+  "use cache";
+  cacheLife(CACHE_FEATURED);
+  cacheTag(CATALOG_TAGS.all, CATALOG_TAGS.categories, CATALOG_TAGS.products);
+  const db = createPublicClient();
+  const ids = new Set<string>();
+  const PAGE = 1000;
+  for (let page = 0; page < 5; page++) {
+    const rows = unwrap(
+      await db.from("products").select("brand_id").eq("status", "published").not("brand_id", "is", null).order("id").range(page * PAGE, page * PAGE + PAGE - 1),
+      "brands in use",
+    );
+    for (const row of rows) if (row.brand_id) ids.add(row.brand_id);
+    if (rows.length < PAGE) break;
+  }
+  if (ids.size === 0) return [];
+  const brands = unwrap(
+    await db.from("brands").select(BRAND_COLUMNS).in("id", [...ids].slice(0, 200)).eq("is_active", true).order("name"),
+    "brands",
+  );
+  return brands.map((b) => b.name);
 }
 
 export async function getCategoryById(id: string): Promise<Category | null> {

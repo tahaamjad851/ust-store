@@ -9,7 +9,7 @@ import { ProductListing, ProductListingSkeleton } from "@/components/products/pr
 import { SubcategoryCard } from "@/components/products/subcategory-card";
 import { TractorSelector } from "@/components/products/tractor-selector";
 import { Button } from "@/components/ui/button";
-import { whatsappHref } from "@/lib/contact";
+import { whatsappLink } from "@/lib/contact";
 import {
   getCategoryBySlug,
   getCategoryTree,
@@ -45,6 +45,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps<"
     getTractorModels(),
   ]);
   const basePath = `/categories/${category.slug}`;
+  const advice = whatsappLink(settings.whatsapp_number, `Hello, I need help finding a part in ${category.name}.`);
 
   return (
     <div className={`${container} space-y-8 py-6`}>
@@ -55,42 +56,46 @@ export default async function CategoryPage({ params, searchParams }: PageProps<"
           <h1 className="text-headline-xl-mobile lg:text-headline-xl">{category.name}</h1>
           {category.description && <p className="max-w-2xl text-body-lg text-muted-foreground">{category.description}</p>}
         </div>
-        <aside aria-labelledby="advice-title" className="rounded-lg border border-border bg-surface-container p-4">
-          <h2 id="advice-title" className="text-headline-sm">
-            Not sure which part you need?
-          </h2>
-          <p className="mt-1 text-body-md text-muted-foreground">
-            Send your tractor model and a photo of the old part. {settings.business_hours}.
-          </p>
-          <Button asChild className="mt-3 h-11 w-full bg-whatsapp hover:bg-whatsapp-hover">
-            <a href={whatsappHref(settings.whatsapp_number, `Hello, I need help finding a part in ${category.name}.`)} target="_blank" rel="noopener noreferrer">
-              <MessageCircle />
-              Send a photo on WhatsApp
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
-          </Button>
-        </aside>
+        {advice && (
+          <aside aria-labelledby="advice-title" className="rounded-lg border border-border bg-surface-container p-4">
+            <h2 id="advice-title" className="text-headline-sm">
+              Not sure which part you need?
+            </h2>
+            <p className="mt-1 text-body-md text-muted-foreground">
+              Send your tractor model and a photo of the old part.{settings.business_hours.trim() ? ` ${settings.business_hours.trim().replace(/\.+$/, "")}.` : ""}
+            </p>
+            <Button asChild className="mt-3 h-11 w-full bg-whatsapp hover:bg-whatsapp-hover">
+              <a href={advice} target="_blank" rel="noopener noreferrer">
+                <MessageCircle />
+                Send a photo on WhatsApp
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </Button>
+          </aside>
+        )}
       </header>
 
       {children.length > 0 ? (
         <>
-          <section aria-labelledby="models-title" className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-low p-3">
-            <h2 id="models-title" className="mr-2 font-sans text-label-md uppercase">
-              Shop by model:
-            </h2>
-            <ul className="flex flex-wrap gap-2">
-              {models.map((m) => (
-                <li key={m.id}>
-                  <Link
-                    href={`/shop?model=${m.id}`}
-                    className="inline-flex min-h-11 items-center rounded-full border border-border bg-card px-3 text-label-md hover:border-primary"
-                  >
-                    {m.model}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {models.length > 0 && (
+            <section aria-labelledby="models-title" className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-low p-3">
+              <h2 id="models-title" className="mr-2 font-sans text-label-md uppercase">
+                Shop by model:
+              </h2>
+              <ul className="flex flex-wrap gap-2">
+                {models.map((m) => (
+                  <li key={m.id}>
+                    <Link
+                      href={`/shop?model=${m.id}`}
+                      className="inline-flex min-h-11 items-center rounded-full border border-border bg-card px-3 text-label-md hover:border-primary"
+                    >
+                      {m.model}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section aria-labelledby="subcats-title">
             <h2 id="subcats-title" className="mb-4 text-headline-lg-mobile lg:text-headline-lg">
@@ -105,13 +110,15 @@ export default async function CategoryPage({ params, searchParams }: PageProps<"
             </ul>
           </section>
 
-          <section aria-labelledby="find-title" className="rounded-lg border border-border bg-card p-4 shadow-card lg:p-6">
-            <h2 id="find-title" className="text-headline-md">
-              Find parts for your tractor
-            </h2>
-            <p className="mt-1 mb-4 text-body-md text-muted-foreground">Choose your make and model to see matching parts.</p>
-            <TractorSelector models={models} action="/shop" />
-          </section>
+          {models.length > 0 && (
+            <section aria-labelledby="find-title" className="rounded-lg border border-border bg-card p-4 shadow-card lg:p-6">
+              <h2 id="find-title" className="text-headline-md">
+                Find parts for your tractor
+              </h2>
+              <p className="mt-1 mb-4 text-body-md text-muted-foreground">Choose your make and model to see matching parts.</p>
+              <TractorSelector models={models} action="/shop" />
+            </section>
+          )}
 
           <TrustStrip settings={settings} />
         </>

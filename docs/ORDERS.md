@@ -138,6 +138,12 @@ A brand-new project does not use this file by hand: `npm run setup:build` genera
 
 The Phase 1 database tests were updated for this phase (no shipping fee at checkout, the new workflow, bank transfer switched on only inside the one test that needs it).
 
+### Test isolation and the leftovers on DEV
+
+Orders are never deleted, so what a test run leaves behind is still there for the next run. `orders.test.ts` is written for that: every test uses its own new customer (the open-order limit counts by phone and by user), every tracking token and key it stores is random (`orders.tracking_token_hash` is unique for ever), only one test changes a store setting (the limit itself, restored in `finally`), and `afterAll` cancels the run's open orders even after failures (`cancelOpenOrders` in `tests/integration/db/helpers.ts`), then archives the fixtures and deletes the users.
+
+Runs made before that change left open test orders and test fixtures on DEV. `supabase/checks/test_data_preview.sql` (read-only) counts them and shows whether a killed run left a setting changed; `supabase/checks/test_data_cleanup.sql` removes them. Dev only: the cleanup opens the two append-only triggers inside one statement, deletes only rows that are recognisably test rows (database tests: `ust_test_` delivery methods, `UST-TEST-` SKUs, `ust-test-` products; Playwright: `zz-e2e-` products, `ZZ-E2E-` lines, customers named "E2E Buyer ...", users `ust-e2e-...@example.test`), and closes the triggers again. It refuses to run if a selected order has a line that is not a test line or an invoice, if a test product has stock movements for, or is on a line of, an order that is not a test order, or if a test product has a variant with a non-test SKU. Photo files of deleted products stay in Storage (the preview file has a query that lists them), and the audit log and price history are left alone. It was run against a local Postgres 17 with the real migrations, not against Supabase.
+
 ## Known limits
 
 - Bank transfer, EasyPaisa/online and payment proofs are not built (the switches exist and the database enforces "paid before dispatch" for them, but there is no payment screen).

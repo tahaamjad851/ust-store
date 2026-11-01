@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { STOCK_LABEL } from "@/features/inventory/stock";
-import { whatsappHref } from "@/lib/contact";
+import { whatsappLink } from "@/lib/contact";
 import { discount, formatPKR } from "@/lib/pricing";
 import type { ProductVariant } from "@/types/catalog";
 
@@ -96,9 +96,11 @@ export function SelectedWhatsAppButton({ number, productName }: { number: string
   const { selected } = useVariantSelection();
   const variant = selected.name.trim().toLowerCase() === "default" ? "" : `, ${selected.name}`;
   const message = `Hello, I'd like to order: ${productName}${variant} (SKU ${selected.sku}).`;
+  const href = whatsappLink(number, message);
+  if (!href) return null;
   return (
     <Button asChild className="h-12 w-full bg-whatsapp hover:bg-whatsapp-hover">
-      <a href={whatsappHref(number, message)} target="_blank" rel="noopener noreferrer">
+      <a href={href} target="_blank" rel="noopener noreferrer">
         <MessageCircle />
         Order or ask on WhatsApp
         <span className="sr-only">(opens in a new tab)</span>

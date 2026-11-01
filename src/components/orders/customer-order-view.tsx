@@ -5,7 +5,7 @@ import { OrderTimeline } from "@/components/orders/order-timeline";
 import { Button } from "@/components/ui/button";
 import type { HistoryEntry, OrderStatus } from "@/features/orders/status";
 import { PAYMENT_METHOD_LABEL, type AddressSnapshot, type OrderLine, type PaymentMethodValue, type PaymentStatusValue, type ShipmentInfo } from "@/features/orders/types";
-import { telHref, whatsappHref } from "@/lib/contact";
+import { telLink, whatsappLink } from "@/lib/contact";
 import { formatDate, formatDateTime } from "@/lib/format-date";
 
 export type CustomerOrderData = {
@@ -149,27 +149,33 @@ export function CustomerOrderView({ order, justPlaced, contact, viaLink }: Props
             {viaLink && <p className="text-body-sm text-muted-foreground">Anyone with this page&apos;s link can see this order. Keep the link to yourself.</p>}
           </section>
 
-          <section aria-labelledby="help-title" className="rounded-lg border border-border bg-surface-container p-4">
-            <h2 id="help-title" className="text-headline-sm">
-              Questions about your order?
-            </h2>
-            <p className="mt-1 text-body-md text-muted-foreground">Quote the order number {order.order_number}.</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <Button asChild variant="outline" className="h-11">
-                <a href={telHref(contact.phone_primary)}>
-                  <Phone aria-hidden="true" />
-                  Call {contact.phone_primary}
-                </a>
-              </Button>
-              <Button asChild className="h-11 bg-whatsapp hover:bg-whatsapp-hover">
-                <a href={whatsappHref(contact.whatsapp_number, `Hello, my order number is ${order.order_number}.`)} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle aria-hidden="true" />
-                  WhatsApp us
-                  <span className="sr-only">(opens in a new tab)</span>
-                </a>
-              </Button>
-            </div>
-          </section>
+          {(telLink(contact.phone_primary) || whatsappLink(contact.whatsapp_number)) && (
+            <section aria-labelledby="help-title" className="rounded-lg border border-border bg-surface-container p-4">
+              <h2 id="help-title" className="text-headline-sm">
+                Questions about your order?
+              </h2>
+              <p className="mt-1 text-body-md text-muted-foreground">Quote the order number {order.order_number}.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                {telLink(contact.phone_primary) && (
+                  <Button asChild variant="outline" className="h-11">
+                    <a href={telLink(contact.phone_primary) ?? undefined}>
+                      <Phone aria-hidden="true" />
+                      Call {contact.phone_primary}
+                    </a>
+                  </Button>
+                )}
+                {whatsappLink(contact.whatsapp_number) && (
+                  <Button asChild className="h-11 bg-whatsapp hover:bg-whatsapp-hover">
+                    <a href={whatsappLink(contact.whatsapp_number, `Hello, my order number is ${order.order_number}.`) ?? undefined} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle aria-hidden="true" />
+                      WhatsApp us
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </section>
+          )}
         </aside>
       </div>
     </div>

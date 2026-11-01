@@ -5,7 +5,7 @@ import { MessageCircle } from "lucide-react";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ProductListing, ProductListingSkeleton } from "@/components/products/product-listing";
 import { Button } from "@/components/ui/button";
-import { whatsappHref } from "@/lib/contact";
+import { whatsappLink } from "@/lib/contact";
 import { getCategoryBySlug, getCategoryTree, getChildCategories, getStoreSettings } from "@/services/catalog";
 
 type Props = PageProps<"/categories/[category]/[subcategory]">;
@@ -41,6 +41,7 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
   const [settings, siblings] = await Promise.all([getStoreSettings(), getChildCategories(parent.id)]);
   const parentPath = `/categories/${parent.slug}`;
   const basePath = `${parentPath}/${category.slug}`;
+  const bulk = whatsappLink(settings.whatsapp_number, `Hello, I'd like a quote for a bulk order of ${category.name}.`);
 
   return (
     <>
@@ -69,30 +70,32 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
         </Suspense>
       </div>
 
-      <section aria-labelledby="bulk-title" className="on-dark mt-6 bg-primary text-primary-foreground">
-        <div className="mx-auto flex max-w-page flex-col gap-4 px-margin py-8 lg:flex-row lg:items-center lg:justify-between lg:px-margin-desktop">
-          <div>
-            <h2 id="bulk-title" className="text-headline-md">
-              Ordering {category.name.toLowerCase()} for a workshop or dealership?
-            </h2>
-            <p className="mt-1 text-body-md text-primary-foreground/85">
-              Ask us for wholesale pricing on bulk orders. Call{" "}
-              <span className="tabular">{settings.phone_primary}</span> or message us on WhatsApp.
-            </p>
+      {bulk && (
+        <section aria-labelledby="bulk-title" className="on-dark mt-6 bg-primary text-primary-foreground">
+          <div className="mx-auto flex max-w-page flex-col gap-4 px-margin py-8 lg:flex-row lg:items-center lg:justify-between lg:px-margin-desktop">
+            <div>
+              <h2 id="bulk-title" className="text-headline-md">
+                Ordering {category.name.toLowerCase()} for a workshop or dealership?
+              </h2>
+              <p className="mt-1 text-body-md text-primary-foreground/85">
+                Message us on WhatsApp for a quote on a bulk order.
+                {settings.phone_primary.trim() && (
+                  <>
+                    {" "}Or call <span className="tabular">{settings.phone_primary}</span>.
+                  </>
+                )}
+              </p>
+            </div>
+            <Button asChild className="h-11 bg-card text-foreground hover:bg-surface-low">
+              <a href={bulk} target="_blank" rel="noopener noreferrer">
+                <MessageCircle />
+                Ask for a bulk quote
+                <span className="sr-only">(opens WhatsApp in a new tab)</span>
+              </a>
+            </Button>
           </div>
-          <Button asChild className="h-11 bg-card text-foreground hover:bg-surface-low">
-            <a
-              href={whatsappHref(settings.whatsapp_number, `Hello, I'd like wholesale pricing for ${category.name}.`)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <MessageCircle />
-              Ask for wholesale pricing
-              <span className="sr-only">(opens WhatsApp in a new tab)</span>
-            </a>
-          </Button>
-        </div>
-      </section>
+        </section>
+      )}
     </>
   );
 }

@@ -20,6 +20,18 @@ export function telHref(phone: string): string {
   return `tel:${digits.startsWith("0") ? `+92${digits.slice(1)}` : `+${digits}`}`;
 }
 
+/**
+ * The shop's own contact links, or null while the number is not set (a new project starts with empty contact
+ * settings). Public pages use these so that no dead `https://wa.me/` or `tel:+` link is ever rendered.
+ */
+export function whatsappLink(number: string, message?: string): string | null {
+  return number.replace(/\D/g, "") ? whatsappHref(number, message) : null;
+}
+
+export function telLink(phone: string): string | null {
+  return phone.replace(/\D/g, "") ? telHref(phone) : null;
+}
+
 /** WhatsApp link for a customer's stored mobile number (03XXXXXXXXX, as the database keeps it). */
 export function whatsappHrefForPkMobile(mobile: string, message?: string): string {
   const digits = mobile.replace(/\D/g, "");

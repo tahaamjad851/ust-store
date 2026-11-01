@@ -137,6 +137,26 @@ export async function archiveFixtures() {
   if (deliveryReady) ok(await service.from("delivery_methods").update({ is_active: false }).eq("id", DELIVERY_METHOD_ID), "archive delivery");
 }
 
+/**
+ * Cancels this run's orders that are still open (New, Contacted, Confirmed, Dispatched), as the given admin, so they
+ * stop holding stock and stop counting against anyone's open-order limit. Orders are never deleted (the ledger is
+ * append-only); a cancelled one is the closest thing to clean. Call it in afterAll BEFORE deleteUsers(): it needs the
+ * admin's session. Orders of this run are recognised by the run's own delivery method.
+ */
+export async function cancelOpenOrders(admin: TestUser) {
+  if (!deliveryReady) return;
+  const open = must(
+    await service.from("orders").select("id").eq("delivery_method_id", DELIVERY_METHOD_ID).in("status", ["pending", "contacted", "confirmed", "dispatched"]),
+    "open test orders",
+  );
+  const failures: string[] = [];
+  for (const order of open) {
+    const res = await admin.client.rpc("set_order_status", { p_order_id: order.id, p_status: "cancelled", p_note: `UST TEST ${RUN} cleanup` });
+    if (res.error) failures.push(`${order.id}: ${res.error.message}`);
+  }
+  if (failures.length) throw new Error(`cancelOpenOrders: ${failures.join("; ")}`);
+}
+
 /** Runs fn with a store setting temporarily changed, then restores it. */
 export async function withSetting<T>(column: string, value: unknown, fn: () => Promise<T>): Promise<T> {
   const before = must(await service.from("store_settings").select(column).eq("id", true).single(), "read setting") as unknown as Record<string, unknown>;

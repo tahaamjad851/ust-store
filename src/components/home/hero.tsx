@@ -2,10 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { whatsappHref } from "@/lib/contact";
+import { whatsappLink } from "@/lib/contact";
+import { joinSentences } from "@/lib/store-text";
 import type { StoreSettings } from "@/types/store";
 
 export function Hero({ settings }: { settings: StoreSettings }) {
+  const whatsapp = whatsappLink(settings.whatsapp_number);
   return (
     <section aria-labelledby="hero-title" className="on-dark relative isolate overflow-hidden bg-brand-deep text-primary-foreground">
       <Image
@@ -22,7 +24,7 @@ export function Hero({ settings }: { settings: StoreSettings }) {
             Tractor parts &amp; lubricants
           </h1>
           <p className="text-body-lg text-primary-foreground/90">
-            {settings.value_statement}. Replacement parts, oils and filters for the tractors used on Pakistani farms.
+            {joinSentences(settings.value_statement, "Replacement parts, oils and filters for the tractors used on Pakistani farms")}
           </p>
           <div className="flex flex-col gap-3 pt-2 sm:flex-row">
             <Button asChild className="h-11 bg-card text-foreground hover:bg-surface-low">
@@ -31,13 +33,15 @@ export function Hero({ settings }: { settings: StoreSettings }) {
                 <ArrowRight />
               </Link>
             </Button>
-            <Button asChild variant="outline" className="h-11 border-primary-foreground/60 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
-              <a href={whatsappHref(settings.whatsapp_number)} target="_blank" rel="noopener noreferrer">
-                <MessageCircle />
-                Ask on WhatsApp
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
-            </Button>
+            {whatsapp && (
+              <Button asChild variant="outline" className="h-11 border-primary-foreground/60 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+                <a href={whatsapp} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle />
+                  Ask on WhatsApp
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </Button>
+            )}
           </div>
         </div>
       </div>

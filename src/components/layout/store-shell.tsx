@@ -8,7 +8,7 @@ import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { WhatsAppButton } from "@/components/layout/whatsapp-button";
-import { whatsappHref } from "@/lib/contact";
+import { whatsappLink } from "@/lib/contact";
 import { getCategoryTree, getStoreSettings, getTractorModels } from "@/services/catalog";
 
 // The dev catalogue is the DEMO seed. The notice stays until DEMO_CATALOG_NOTICE=off is set, which is part
@@ -57,7 +57,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
     <CartProvider>
       <CategoryDrawerProvider
         categories={drawerCategories}
-        whatsappHref={whatsappHref(settings.whatsapp_number)}
+        whatsappHref={whatsappLink(settings.whatsapp_number)}
         phone={settings.phone_primary}
       >
         <a

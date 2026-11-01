@@ -1,11 +1,12 @@
 // Filterable product grid. Filters are a plain GET form, so they work without JavaScript.
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { parseListingParams, SORT_OPTIONS, type ListingParams } from "@/features/catalog/listing";
+import { whatsappLink } from "@/lib/contact";
 import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import { getProductPage, getTractorModels } from "@/services/catalog";
+import { getProductPage, getStoreSettings, getTractorModels } from "@/services/catalog";
 import type { Category } from "@/types/catalog";
 import { FiltersPanel } from "./filters-panel";
 import { ProductCard } from "./product-card";
@@ -38,9 +39,10 @@ function hrefWith(basePath: string, params: ListingParams, overrides: Partial<Re
 export async function ProductListing({ basePath, categoryId = null, groups, searchParams }: Props) {
   const params = parseListingParams(await searchParams);
   // Searching, filtering, sorting and paging all happen in the database.
-  const [{ items, page, pageCount, total, fitmentLabels }, models] = await Promise.all([
+  const [{ items, page, pageCount, total, fitmentLabels }, models, settings] = await Promise.all([
     getProductPage(params, categoryId),
     getTractorModels(),
+    getStoreSettings(),
   ]);
   const model = models.find((m) => m.id === params.model);
   const makes = [...new Set(models.map((m) => m.make))];
@@ -54,6 +56,36 @@ export async function ProductListing({ basePath, categoryId = null, groups, sear
       href: hrefWith(basePath, params, { min: undefined, max: undefined, page: 1 }),
     },
   ].filter((a): a is { label: string; href: string } => Boolean(a));
+
+  // Nothing to list and nothing filtered out: the shop (or this category) simply has no products yet. Say so plainly,
+  // without a filter sidebar, a "0 products" count or a "no match" message that would suggest the visitor did something.
+  if (items.length === 0 && active.length === 0) {
+    const whatsapp = whatsappLink(settings.whatsapp_number);
+    return (
+      <div className="rounded-lg border border-dashed border-input bg-card p-8 text-center" data-testid="empty-listing">
+        <p className="text-label-lg">{categoryId ? "There are no products in this category yet." : "There are no products in the shop yet."}</p>
+        <p className="mx-auto mt-1 max-w-md text-body-md text-muted-foreground">
+          {whatsapp ? "Check back soon, or message us and we will help you find what you need." : "Please check back soon."}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          {categoryId && (
+            <Link href="/shop" className="inline-flex min-h-11 items-center text-label-md text-primary underline">
+              See all products
+            </Link>
+          )}
+          {whatsapp && (
+            <Button asChild className="h-11 bg-whatsapp hover:bg-whatsapp-hover">
+              <a href={whatsapp} target="_blank" rel="noopener noreferrer">
+                <MessageCircle />
+                Message us on WhatsApp
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const filters = (
     <form id={FORM_ID} action={basePath} method="get" className="space-y-5">

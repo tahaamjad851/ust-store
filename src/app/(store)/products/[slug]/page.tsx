@@ -13,6 +13,7 @@ import {
 import { Breadcrumbs, type Crumb } from "@/components/layout/breadcrumbs";
 import { ProductCard } from "@/components/products/product-card";
 import { ProductImageView } from "@/components/products/product-image";
+import { whatsappLink } from "@/lib/contact";
 import { discount } from "@/lib/pricing";
 import {
   getCategoryById,
@@ -171,9 +172,11 @@ export default async function ProductPage({ params }: Props) {
               ) : (
                 <p className="mt-2 text-body-md text-muted-foreground">Universal or not listed for a specific model.</p>
               )}
-              <p className="mt-3 text-body-sm text-muted-foreground">
-                Not sure it fits? Send a photo of your old part on WhatsApp before ordering.
-              </p>
+              {whatsappLink(settings.whatsapp_number) && (
+                <p className="mt-3 text-body-sm text-muted-foreground">
+                  Not sure it fits? Send a photo of your old part on WhatsApp before ordering.
+                </p>
+              )}
             </section>
           </div>
         </VariantSelectionProvider>
@@ -181,13 +184,15 @@ export default async function ProductPage({ params }: Props) {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section aria-labelledby="desc-title" className="space-y-6 rounded-lg border border-border bg-card p-4 lg:p-6">
-          <div>
-            <h2 id="desc-title" className="text-headline-md">
-              Description
-            </h2>
-            {/* Plain text from the admin; React escapes it. Line breaks are kept. */}
-            <p className="mt-2 text-body-lg whitespace-pre-line">{product.description || product.short_description}</p>
-          </div>
+          {(product.description || product.short_description) && (
+            <div>
+              <h2 id="desc-title" className="text-headline-md">
+                Description
+              </h2>
+              {/* Plain text from the admin; React escapes it. Line breaks are kept. */}
+              <p className="mt-2 text-body-lg whitespace-pre-line">{product.description || product.short_description}</p>
+            </div>
+          )}
           {specRows.length > 0 && (
             <div>
               <h2 className="text-headline-md">Specifications</h2>

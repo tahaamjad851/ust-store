@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { loadCheckoutPrefill, placeOrderAction, type CheckoutPrefill } from "@/features/orders/actions";
-import { whatsappHref } from "@/lib/contact";
+import { telLink, whatsappLink } from "@/lib/contact";
 import { formatPKR } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 import { ADDRESS_TYPES, checkoutSchema, PROVINCES, type CheckoutInput } from "@/lib/validation/checkout";
@@ -653,21 +653,32 @@ export function CheckoutForm({ settings }: Props) {
           </Link>
         </section>
 
-        <section aria-labelledby="checkout-help-title" className="rounded-lg border border-border bg-surface-container p-4">
-          <h2 id="checkout-help-title" className="text-headline-sm">
-            Need help with your order?
-          </h2>
-          <p className="mt-1 text-body-md text-muted-foreground">
-            Call <span className="tabular">{settings.phone_primary}</span> or message us before you order.
-          </p>
-          <Button asChild className={cn("mt-3 h-11 w-full bg-whatsapp hover:bg-whatsapp-hover")}>
-            <a href={whatsappHref(settings.whatsapp_number)} target="_blank" rel="noopener noreferrer">
-              <MessageCircle />
-              WhatsApp us
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
-          </Button>
-        </section>
+        {(telLink(settings.phone_primary) || whatsappLink(settings.whatsapp_number)) && (
+          <section aria-labelledby="checkout-help-title" className="rounded-lg border border-border bg-surface-container p-4">
+            <h2 id="checkout-help-title" className="text-headline-sm">
+              Need help with your order?
+            </h2>
+            <p className="mt-1 text-body-md text-muted-foreground">
+              {telLink(settings.phone_primary) ? (
+                <>
+                  Call <span className="tabular">{settings.phone_primary}</span>
+                  {whatsappLink(settings.whatsapp_number) ? " or message us before you order." : " before you order."}
+                </>
+              ) : (
+                "Message us before you order."
+              )}
+            </p>
+            {whatsappLink(settings.whatsapp_number) && (
+              <Button asChild className={cn("mt-3 h-11 w-full bg-whatsapp hover:bg-whatsapp-hover")}>
+                <a href={whatsappLink(settings.whatsapp_number) ?? undefined} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle />
+                  WhatsApp us
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </Button>
+            )}
+          </section>
+        )}
       </aside>
     </form>
   );

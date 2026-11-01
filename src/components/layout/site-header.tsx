@@ -2,13 +2,14 @@ import Link from "next/link";
 import Form from "next/form";
 import { Menu, Phone, Search, Tractor, User } from "lucide-react";
 import { CartLink } from "@/components/cart/cart-link";
-import { telHref } from "@/lib/contact";
+import { telLink } from "@/lib/contact";
 import type { StoreSettings } from "@/types/store";
 import { CategoryDrawerTrigger } from "./category-drawer";
 
 const iconLink = "size-11 items-center justify-center gap-2 rounded-lg hover:bg-surface-low lg:w-auto lg:px-3";
 
 export function SiteHeader({ settings }: { settings: StoreSettings }) {
+  const tel = telLink(settings.phone_primary);
   return (
     <header className="border-b border-border bg-card">
       <div className="mx-auto grid max-w-page grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-3 px-margin py-3 lg:grid-cols-[auto_auto_1fr_auto] lg:gap-x-6 lg:px-margin-desktop">
@@ -27,9 +28,11 @@ export function SiteHeader({ settings }: { settings: StoreSettings }) {
             <span className="block font-display text-label-lg leading-tight text-brand-deep sm:text-headline-sm">
               {settings.business_name}
             </span>
-            <span className="hidden truncate text-label-sm uppercase text-muted-foreground sm:block">
-              {settings.tagline}
-            </span>
+            {settings.tagline.trim() && (
+              <span className="hidden truncate text-label-sm uppercase text-muted-foreground sm:block">
+                {settings.tagline}
+              </span>
+            )}
           </span>
         </Link>
 
@@ -64,12 +67,14 @@ export function SiteHeader({ settings }: { settings: StoreSettings }) {
               Account
             </span>
           </Link>
-          <a href={telHref(settings.phone_primary)} className={`${iconLink} inline-flex`} aria-label={`Call ${settings.phone_primary}`}>
-            <Phone className="size-5" aria-hidden="true" />
-            <span className="hidden text-label-lg tabular lg:inline" aria-hidden="true">
-              Call us
-            </span>
-          </a>
+          {tel && (
+            <a href={tel} className={`${iconLink} inline-flex`} aria-label={`Call ${settings.phone_primary}`}>
+              <Phone className="size-5" aria-hidden="true" />
+              <span className="hidden text-label-lg tabular lg:inline" aria-hidden="true">
+                Call us
+              </span>
+            </a>
+          )}
           <CartLink />
         </nav>
       </div>

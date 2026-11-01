@@ -26,7 +26,8 @@ export function CategoryDrawerProvider({
   children,
 }: {
   categories: DrawerCategory[];
-  whatsappHref: string;
+  /** null while the shop has no WhatsApp number set: the contact card is then left out. */
+  whatsappHref: string | null;
   phone: string;
   children: React.ReactNode;
 }) {
@@ -177,6 +178,7 @@ export function CategoryDrawerProvider({
               </nav>
             </>
           )}
+          {whatsappHref && (
           <div className="border-t border-border p-4">
             <a
               href={whatsappHref}
@@ -187,11 +189,12 @@ export function CategoryDrawerProvider({
               <MessageCircle className="size-5 shrink-0" aria-hidden="true" />
               <span className="flex-1 text-label-lg">
                 Contact us on WhatsApp
-                <span className="block text-body-sm font-normal tabular">{phone}</span>
+                {phone && <span className="block text-body-sm font-normal tabular">{phone}</span>}
               </span>
               <span className="sr-only">(opens WhatsApp in a new tab)</span>
             </a>
           </div>
+          )}
         </SheetContent>
       </Sheet>
     </DrawerContext.Provider>

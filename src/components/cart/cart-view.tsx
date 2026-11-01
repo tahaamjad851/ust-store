@@ -5,7 +5,7 @@ import { ArrowLeft, Lock, MessageCircle, ShoppingCart, Trash2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { ProductImageView } from "@/components/products/product-image";
 import { StockIndicator } from "@/components/products/stock-indicator";
-import { whatsappHref } from "@/lib/contact";
+import { whatsappLink } from "@/lib/contact";
 import { formatPKR } from "@/lib/pricing";
 import { MAX_LINE_QTY, useCart } from "./cart-provider";
 import { QuantityStepper } from "./quantity-stepper";
@@ -209,9 +209,9 @@ export function CartView({
                 </Button>
               </>
             )}
-            {sellableCount > 0 && (
+            {sellableCount > 0 && whatsappLink(whatsappNumber, waText) && (
               <Button asChild className="h-12 w-full bg-whatsapp hover:bg-whatsapp-hover">
-                <a href={whatsappHref(whatsappNumber, waText)} target="_blank" rel="noopener noreferrer">
+                <a href={whatsappLink(whatsappNumber, waText) ?? undefined} target="_blank" rel="noopener noreferrer">
                   <MessageCircle />
                   Order on WhatsApp
                   <span className="sr-only">(opens in a new tab)</span>
